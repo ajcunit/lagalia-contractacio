@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import os
 import httpx
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from database import engine, Base, SessionLocal
 from routers import departamentos, empleados, contratos, sincronizacion, cpv, config, superbuscador, contratos_menores, favoritos, auth, adjudicatarios, auditoria
 from services.scheduler_service import start_scheduler, shutdown_scheduler
@@ -107,13 +107,27 @@ app.mount("/api", api_app)
 
 # Mount frontend static files
 # In Docker, frontend files will be in backend/static/
+# In local development, they are in ../frontend/dist
 static_path = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.exists(static_path):
+    # Try local dev path
+    static_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+
 if os.path.exists(static_path):
+    print(f"Mounted static files from {static_path}")
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 
     # Catch-all for SPA client-side routing
     @app.exception_handler(404)
     async def not_found_handler(request, exc):
-        return FileResponse(os.path.join(static_path, "index.html"))
+        # Don't catch 404s on /api/
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        
+        index_html = os.path.join(static_path, "index.html")
+        if os.path.exists(index_html):
+            return FileResponse(index_html)
+        return JSONResponse(status_code=404, content={"detail": "index.html not found"})
 else:
-    print(f"Warning: Static files path not found at {static_path}")
+    print(f"Warning: Static files path not found. Checked 'static' and '../frontend/dist'")
+
