@@ -1,0 +1,365 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
+from typing import List, Optional, Dict
+from datetime import date, datetime
+from database import get_db
+import models
+import schemas
+from services.auth_service import get_current_user
+from services.access_control import apply_department_filter
+from fastapi import Header
+
+router = APIRouter(prefix="/contratos", tags=["contratos"])
+
+
+@router.get("/", response_model=List[schemas.ContratoListItem])
+def list_contratos(
+    skip: int = 0,
+    limit: int = 50,
+    estat_actual: Optional[str] = None,
+    tipus_contracte: Optional[str] = None,
+    procediment: Optional[str] = None,
+    fecha_inicio_desde: Optional[date] = None,
+    fecha_inicio_hasta: Optional[date] = None,
+    importe_min: Optional[float] = None,
+    importe_max: Optional[float] = None,
+    adjudicatari_nom: Optional[str] = None,
+    cpv_principal_codi: Optional[str] = None,
+    departamento_id: Optional[int] = None,
+    estado_interno: Optional[str] = None,
+    busqueda: Optional[str] = None,
+    te_prorroga: Optional[bool] = None,
+    alerta_finalitzacio: Optional[bool] = None,
+    possiblement_finalitzat: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user),
+    x_view_mode: str = Header(alias="X-View-Mode", default="user")
+):
+    query = db.query(models.Contrato)
+    query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
+    
+    # Subquery: pick one representative contract per codi_expedient (lowest id) among those visible to user
+    subquery_base = db.query(models.Contrato)
+    subquery_base = apply_department_filter(subquery_base, models.Contrato, current_user, x_view_mode)
+    
+    representative_ids = subquery_base.with_entities(
+        func.min(models.Contrato.id).label('min_id')
+    ).group_by(models.Contrato.codi_expedient).subquery()
+    
+    query = query.filter(models.Contrato.id.in_(
+        db.query(representative_ids.c.min_id)
+    ))
+    
+    if estat_actual:
+        if estat_actual == "Sin estado":
+            query = query.filter(or_(models.Contrato.estat_actual == None, models.Contrato.estat_actual == ""))
+        else:
+            query = query.filter(models.Contrato.estat_actual == estat_actual)
+    if tipus_contracte:
+        query = query.filter(models.Contrato.tipus_contracte == tipus_contracte)
+    if procediment:
+        query = query.filter(models.Contrato.procediment == procediment)
+    if fecha_inicio_desde:
+        query = query.filter(models.Contrato.data_inici >= fecha_inicio_desde)
+    if fecha_inicio_hasta:
+        query = query.filter(models.Contrato.data_inici <= fecha_inicio_hasta)
+    if importe_min is not None:
+        query = query.filter(models.Contrato.import_adjudicacio_amb_iva >= importe_min)
+    if importe_max is not None:
+        query = query.filter(models.Contrato.import_adjudicacio_amb_iva <= importe_max)
+    if adjudicatari_nom:
+        query = query.filter(models.Contrato.adjudicatari_nom.ilike(f"%{adjudicatari_nom}%"))
+    if cpv_principal_codi:
+        query = query.filter(models.Contrato.cpv_principal_codi == cpv_principal_codi)
+    if departamento_id:
+        query = query.filter(models.Contrato.departamento_id == departamento_id)
+    if estado_interno:
+        query = query.filter(models.Contrato.estado_interno == estado_interno)
+    if te_prorroga is not None:
+        if te_prorroga:
+            query = query.filter(models.Contrato.prorrogues.any())
+        else:
+            query = query.filter(~models.Contrato.prorrogues.any())
+    if alerta_finalitzacio is not None:
+        query = query.filter(models.Contrato.alerta_finalitzacio == alerta_finalitzacio)
+    if possiblement_finalitzat is not None:
+        query = query.filter(models.Contrato.possiblement_finalitzat == possiblement_finalitzat)
+    if busqueda:
+        search_term = f"%{busqueda}%"
+        query = query.filter(
+            or_(
+                models.Contrato.codi_expedient.ilike(search_term),
+                models.Contrato.objecte_contracte.ilike(search_term),
+                models.Contrato.adjudicatari_nom.ilike(search_term)
+            )
+        )
+    
+    results = query.order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()
+    
+    if not results:
+        return []
+
+    # Calculate lot counts for the displayed expedients efficiently
+    expedients = [r.codi_expedient for r in results]
+    counts = db.query(
+        models.Contrato.codi_expedient, 
+        func.count(models.Contrato.id)
+    ).filter(
+        models.Contrato.codi_expedient.in_(expedients)
+    ).group_by(models.Contrato.codi_expedient).all()
+    
+    counts_dict = {c[0]: c[1] for c in counts}
+
+    # Inject num_lots into response
+    response_list = []
+    for r in results:
+        item = schemas.ContratoListItem.model_validate(r)
+        item.num_lots = counts_dict.get(r.codi_expedient, 1)
+        item.num_prorrogues = r.num_prorrogues
+        item.num_modificacions = r.num_modificacions
+        response_list.append(item)
+        
+    return response_list
+
+
+@router.get("/stats", response_model=schemas.DashboardStats)
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user),
+    x_view_mode: str = Header(alias="X-View-Mode", default="user")
+):
+    base_query = apply_department_filter(db.query(models.Contrato), models.Contrato, current_user, x_view_mode)
+    base_menores_query = apply_department_filter(db.query(models.ContratoMenor), models.ContratoMenor, current_user, x_view_mode)
+
+    # Total contratos
+    total_contratos = base_query.count()
+    
+    # Contratos por estado
+    estados = base_query.with_entities(
+        models.Contrato.estat_actual,
+        func.count(models.Contrato.id)
+    ).group_by(models.Contrato.estat_actual).all()
+    contratos_por_estado = {estado or "Sin estado": count for estado, count in estados}
+    
+    # Pendientes de aprobación
+    pendientes = base_query.filter(
+        models.Contrato.estado_interno == 'pendiente_aprobacion'
+    ).count()
+    
+    # Total importe
+    total_importe = base_query.with_entities(func.sum(models.Contrato.import_adjudicacio_amb_iva)).scalar() or 0
+    
+    # Última sincronización
+    ultima_sync = db.query(models.Sincronizacion).filter(
+        models.Sincronizacion.estado == 'exitosa'
+    ).order_by(models.Sincronizacion.fecha_hora_fin.desc()).first()
+    
+    # Contratos este mes
+    hoy = date.today()
+    primer_dia_mes = date(hoy.year, hoy.month, 1)
+    contratos_mes = base_query.filter(
+        models.Contrato.fecha_primera_sincronizacion >= primer_dia_mes
+    ).count()
+    
+    # Top adjudicatarios
+    top_adj = base_query.with_entities(
+        models.Contrato.adjudicatari_nom,
+        func.count(models.Contrato.id).label('total_contratos'),
+        func.sum(models.Contrato.import_adjudicacio_amb_iva).label('volumen_total')
+    ).filter(
+        models.Contrato.adjudicatari_nom.isnot(None)
+    ).group_by(
+        models.Contrato.adjudicatari_nom
+    ).order_by(
+        func.sum(models.Contrato.import_adjudicacio_amb_iva).desc()
+    ).limit(10).all()
+    
+    top_adjudicatarios = [
+        {"nombre": adj, "contratos": count, "volumen": float(vol or 0)}
+        for adj, count, vol in top_adj
+    ]
+    
+    # Contratos próximos a finalizar (en 6 meses)
+    contratos_proximos = base_query.filter(
+        models.Contrato.alerta_finalitzacio == True
+    ).count()
+    
+    # Contratos posiblemente finalizados
+    contratos_finalizados = base_query.filter(
+        models.Contrato.possiblement_finalitzat == True
+    ).count()
+    
+    # Contratos Menores
+    total_menores = base_menores_query.count()
+    total_importe_menores = base_menores_query.with_entities(func.sum(models.ContratoMenor.import_adjudicacio)).scalar() or 0
+
+    return schemas.DashboardStats(
+        total_contratos=total_contratos,
+        contratos_por_estado=contratos_por_estado,
+        pendientes_aprobacion=pendientes,
+        total_importe=float(total_importe),
+        ultima_sincronizacion=ultima_sync.fecha_hora_fin if ultima_sync else None,
+        contratos_este_mes=contratos_mes,
+        top_adjudicatarios=top_adjudicatarios,
+        contratos_proximos_finalizar=contratos_proximos,
+        contratos_posiblemente_finalizados=contratos_finalizados,
+        total_contratos_menores=total_menores,
+        total_importe_menores=float(total_importe_menores)
+    )
+
+
+@router.get("/filtros")
+def get_filtro_opciones(db: Session = Depends(get_db)):
+    """Obtiene las opciones disponibles para los filtros"""
+    estados = db.query(models.Contrato.estat_actual).distinct().all()
+    tipos = db.query(models.Contrato.tipus_contracte).distinct().all()
+    procedimientos = db.query(models.Contrato.procediment).distinct().all()
+    
+    return {
+        "estados": [e[0] for e in estados if e[0]],
+        "tipos_contrato": [t[0] for t in tipos if t[0]],
+        "procedimientos": [p[0] for p in procedimientos if p[0]]
+    }
+
+
+@router.get("/cpv-info", response_model=Dict[str, str])
+async def get_cpv_info(codes: str = Query("")):
+    """Obtiene las descripciones de una lista de códigos CPV separados por comas"""
+    from services.cpv_service import get_cpv_descriptions
+    
+    code_list = [c.strip() for c in codes.split(",") if c.strip()]
+    if not code_list:
+        return {}
+        
+    return await get_cpv_descriptions(code_list)
+
+
+@router.get("/{contrato_id}", response_model=schemas.Contrato)
+def get_contrato(contrato_id: int, db: Session = Depends(get_db)):
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    return contrato
+
+
+@router.get("/{contrato_id}/lots", response_model=List[schemas.Contrato])
+def get_contrato_lots(contrato_id: int, db: Session = Depends(get_db)):
+    """Retorna tots els lots del mateix expedient (contractes amb el mateix codi_expedient)"""
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    
+    lots = db.query(models.Contrato).filter(
+        models.Contrato.codi_expedient == contrato.codi_expedient,
+        models.Contrato.id != contrato_id
+    ).order_by(models.Contrato.lots).all()
+    
+    return lots
+
+
+@router.put("/{contrato_id}", response_model=schemas.Contrato)
+def update_contrato(
+    contrato_id: int,
+    contrato: schemas.ContratoUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    db_contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not db_contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    
+    # Permission check: Only admin and responsable_contratacion can update contracts
+    if current_user.rol not in ["admin", "responsable_contratacion"]:
+        raise HTTPException(status_code=403, detail="No tens permissos per modificar contractes")
+    
+    update_data = contrato.model_dump(exclude_unset=True)
+    
+    # Log changes
+    for field, value in update_data.items():
+        old_value = getattr(db_contrato, field)
+        if old_value != value:
+            historial = models.HistorialContrato(
+                contrato_id=contrato_id,
+                campo_modificado=field,
+                valor_anterior=str(old_value) if old_value else None,
+                valor_nuevo=str(value) if value else None,
+                tipo_cambio='manual',
+                usuario_id=current_user.id
+            )
+            db.add(historial)
+        setattr(db_contrato, field, value)
+    db.commit()
+    db.refresh(db_contrato)
+    return db_contrato
+
+
+@router.post("/asignar_masivo")
+def asignar_masivo(
+    asignacion: schemas.ContratoMassAssign,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    if current_user.rol not in ["admin", "responsable_contratacion"]:
+        raise HTTPException(status_code=403, detail="No tens permissos per assignar contractes massivament")
+    
+    contratos = db.query(models.Contrato).filter(
+        models.Contrato.id.in_(asignacion.contrato_ids)
+    ).all()
+    
+    for c in contratos:
+        old_value = c.departamento_id
+        if old_value != asignacion.departamento_id:
+            historial = models.HistorialContrato(
+                contrato_id=c.id,
+                campo_modificado='departamento_id',
+                valor_anterior=str(old_value) if old_value is not None else None,
+                valor_nuevo=str(asignacion.departamento_id) if asignacion.departamento_id is not None else None,
+                tipo_cambio='manual',
+                usuario_id=current_user.id
+            )
+            db.add(historial)
+            c.departamento_id = asignacion.departamento_id
+        
+    db.commit()
+    return {"message": f"{len(contratos)} contractes assignats correctament"}
+
+
+
+@router.get("/{contrato_id}/historial")
+def get_contrato_historial(contrato_id: int, db: Session = Depends(get_db)):
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    
+    historial = db.query(models.HistorialContrato).filter(
+        models.HistorialContrato.contrato_id == contrato_id
+    ).order_by(models.HistorialContrato.fecha_modificacion.desc()).all()
+    
+    return historial
+
+
+@router.get("/{contrato_id}/prorrogues", response_model=List[schemas.Prorroga])
+def get_contrato_prorrogues(contrato_id: int, db: Session = Depends(get_db)):
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    
+    prorrogues = db.query(models.Prorroga).filter(
+        models.Prorroga.contrato_id == contrato_id
+    ).order_by(models.Prorroga.numero_prorroga).all()
+    
+    return prorrogues
+
+
+@router.get("/{contrato_id}/modificacions", response_model=List[schemas.Modificacion])
+def get_contrato_modificacions(contrato_id: int, db: Session = Depends(get_db)):
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+    
+    modificacions = db.query(models.Modificacion).filter(
+        models.Modificacion.contrato_id == contrato_id
+    ).order_by(models.Modificacion.numero_modificacio).all()
+    
+    return modificacions

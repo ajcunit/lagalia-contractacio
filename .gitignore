@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Node.js
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Databases
+*.db
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+backend/error.txt
+backend/debug_access.txt
+backend/logs/
+*.log
