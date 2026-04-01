@@ -97,13 +97,7 @@ def proxy_json(url: str):
 def ping():
     return {"ping": "pong"}
 
-@app.get("/")
-def root():
-    return {
-        "message": "LicitIA - Gestió Intel·ligent de Contractes Públics",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+# Root endpoint removed to allow frontend serving at /
 
 
 @app.get("/health")
