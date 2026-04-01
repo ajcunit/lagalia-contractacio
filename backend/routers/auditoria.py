@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from database import get_db
 import models
 from services.auth_service import get_current_user
-from services.ollama_service import OllamaService
+from services.ai_service import AIService
 from services.access_control import get_sql_dept_filter
 
 router = APIRouter(prefix="/auditoria", tags=["auditoria"])
@@ -113,5 +113,5 @@ async def get_ai_analysis(
         "caducidad_proxima": caducidad[:5]
     }
     
-    analysis = await OllamaService.analyze_auditoria(db, data, custom_prompt=request.custom_prompt)
+    analysis = await AIService.analyze_auditoria(db, data, custom_prompt=request.custom_prompt)
     return {"analysis": analysis}

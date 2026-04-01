@@ -4,7 +4,7 @@ from typing import List, Optional
 import models, schemas
 from database import get_db
 from services.cpv_service import CPVService
-from services.ollama_service import OllamaService
+from services.ai_service import AIService
 
 router = APIRouter(prefix="/cpv", tags=["cpv"])
 
@@ -33,5 +33,6 @@ def sync_cpvs(db: Session = Depends(get_db)):
 
 @router.post("/suggest-ai", response_model=schemas.CPVAIResponse)
 async def suggest_cpvs_ai(request: schemas.CPVAIRequest, db: Session = Depends(get_db)):
-    suggestions = await OllamaService.suggest_cpvs(db, request.descripcion)
+    # AIService decidirà si usa Ollama o Gemini segons la configuració
+    suggestions = await AIService.suggest_cpvs(db, request.descripcion)
     return {"suggestions": suggestions}

@@ -2,13 +2,17 @@ import { useState, useEffect } from 'react';
 import { api, Empleado } from '../api/client';
 import { 
     Globe, 
-    Cpu, 
     Building2, 
     Save, 
     RefreshCw, 
     Loader2, 
     Settings,
-    Users
+    Users,
+    Brain,
+    Bot,
+    Sparkles,
+    MessageSquare,
+    Terminal
 } from 'lucide-react';
 
 import Sincronizacion from './Sincronizacion';
@@ -16,7 +20,7 @@ import Empleados from './Empleados';
 import Departamentos from './Departamentos';
 
 export default function ConfiguracionPage() {
-    const [activeTab, setActiveTab] = useState<'general' | 'sync' | 'personnel'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'sync' | 'personnel' | 'ai'>('general');
     const [personnelTab, setPersonnelTab] = useState<'employees' | 'departments'>('employees');
     
     const [configs, setConfigs] = useState<Record<string, string>>({
@@ -28,7 +32,13 @@ export default function ConfiguracionPage() {
         'ollama_model_cpv': '',
         'ollama_model_auditoria': '',
         'ollama_think': 'smart',
-        'ia_enabled': 'true'
+        'ia_enabled': 'true',
+        'ai_provider': 'ollama',
+        'gemini_api_key': '',
+        'gemini_model': 'gemini-1.5-flash',
+        'prompt_cpv_extract': '',
+        'prompt_cpv_rank': '',
+        'prompt_auditoria': ''
     });
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,7 +58,12 @@ export default function ConfiguracionPage() {
     const loadAllConfig = async () => {
         setLoading(true);
         try {
-            const keys = ['ine10_code', 'sync_api_url', 'prorrogues_api_url', 'cpv_api_url', 'ollama_url', 'ollama_model_cpv', 'ollama_model_auditoria', 'ollama_think', 'ia_enabled'];
+            const keys = [
+                'ine10_code', 'sync_api_url', 'prorrogues_api_url', 'cpv_api_url', 
+                'ollama_url', 'ollama_model_cpv', 'ollama_model_auditoria', 'ollama_think', 
+                'ia_enabled', 'ai_provider', 'gemini_api_key', 'gemini_model',
+                'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria'
+            ];
             const newConfigs: Record<string, string> = {};
             
             for (const key of keys) {
@@ -56,16 +71,12 @@ export default function ConfiguracionPage() {
                     const cfg = await api.getConfig(key);
                     newConfigs[key] = cfg.valor;
                 } catch (err) {
-                    // Fallback defaults for UI display if not in DB yet
+                    // Fallback defaults
                     if (key === 'ine10_code') newConfigs[key] = '4305160009';
-                    else if (key === 'sync_api_url') newConfigs[key] = 'https://analisi.transparenciacatalunya.cat/resource/ybgg-dgi6.json';
-                    else if (key === 'prorrogues_api_url') newConfigs[key] = 'https://analisi.transparenciacatalunya.cat/resource/hb6v-jcbf.json';
-                    else if (key === 'cpv_api_url') newConfigs[key] = 'https://analisi.transparenciacatalunya.cat/resource/wxdw-5eyv.json?$limit=50000';
-                    else if (key === 'ollama_url') newConfigs[key] = 'http://localhost:11434';
-                    else if (key === 'ollama_model_cpv') newConfigs[key] = 'llama3';
-                    else if (key === 'ollama_model_auditoria') newConfigs[key] = 'llama3';
-                    else if (key === 'ollama_think') newConfigs[key] = 'smart';
+                    else if (key === 'ai_provider') newConfigs[key] = 'ollama';
+                    else if (key === 'gemini_model') newConfigs[key] = 'gemini-1.5-flash';
                     else if (key === 'ia_enabled') newConfigs[key] = 'true';
+                    else newConfigs[key] = '';
                 }
             }
             setConfigs(newConfigs);
@@ -160,6 +171,19 @@ export default function ConfiguracionPage() {
                         Gestió de Personal
                     </button>
                 )}
+                {isAdmin && (
+                    <button
+                        onClick={() => setActiveTab('ai')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                            activeTab === 'ai' 
+                            ? 'bg-white text-primary-600 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Brain size={16} />
+                        Serveis IA
+                    </button>
+                )}
             </div>
 
             <div className="mt-6">
@@ -232,131 +256,6 @@ export default function ConfiguracionPage() {
                                     </div>
                                 </div>
 
-                                {/* Ollama */}
-                                <div className="glass-card p-6">
-                                    <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4 justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Cpu size={20} className="text-primary-500" />
-                                            <h2>Intel·ligència Artificial (Ollama)</h2>
-                                        </div>
-                                        <label className="flex items-center cursor-pointer">
-                                            <div className="relative">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="sr-only" 
-                                                    checked={configs.ia_enabled === 'true'}
-                                                    onChange={(e) => handleChange('ia_enabled', e.target.checked ? 'true' : 'false')}
-                                                />
-                                                <div className={`block w-10 h-6 rounded-full transition-colors ${configs.ia_enabled === 'true' ? 'bg-purple-500' : 'bg-slate-300'}`}></div>
-                                                <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.ia_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
-                                            </div>
-                                            <span className="ml-3 text-sm font-medium text-slate-700">Mòduls IA Actius</span>
-                                        </label>
-                                    </div>
-                                    <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-300 ${configs.ia_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700">URL de l'API Ollama</label>
-                                            <input 
-                                                type="text" 
-                                                className="input input-bordered w-full" 
-                                                value={configs.ollama_url}
-                                                onChange={(e) => handleChange('ollama_url', e.target.value)}
-                                                placeholder="http://localhost:11434"
-                                            />
-                                        </div>
-                                        <div className="space-y-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700">Model per Classificació CPV</label>
-                                                <div className="flex gap-2">
-                                                    <select 
-                                                        className="select select-bordered w-full"
-                                                        value={availableModels.includes(configs.ollama_model_cpv) ? configs.ollama_model_cpv : 'manual'}
-                                                        onChange={(e) => handleChange('ollama_model_cpv', e.target.value)}
-                                                    >
-                                                        {!availableModels.includes(configs.ollama_model_cpv) && configs.ollama_model_cpv && (
-                                                            <option value={configs.ollama_model_cpv}>{configs.ollama_model_cpv} (actual)</option>
-                                                        )}
-                                                        {availableModels.map(m => (
-                                                            <option key={`cpv-${m}`} value={m}>{m}</option>
-                                                        ))}
-                                                        <option value="manual">+ Escriure manualment...</option>
-                                                    </select>
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => fetchModels()}
-                                                        className="btn btn-square btn-ghost"
-                                                        disabled={loadingModels}
-                                                    >
-                                                        <RefreshCw size={18} className={loadingModels ? 'animate-spin' : ''} />
-                                                    </button>
-                                                </div>
-                                                {configs.ollama_model_cpv === 'manual' && (
-                                                    <input 
-                                                        type="text" 
-                                                        className="input input-bordered w-full mt-2" 
-                                                        placeholder="Nom del model (ex: mistral)"
-                                                        onBlur={(e) => {
-                                                            if (e.target.value) handleChange('ollama_model_cpv', e.target.value);
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium text-slate-700">Model per Anàlisi i Auditoria</label>
-                                                <div className="flex gap-2">
-                                                    <select 
-                                                        className="select select-bordered w-full"
-                                                        value={availableModels.includes(configs.ollama_model_auditoria) ? configs.ollama_model_auditoria : 'manual'}
-                                                        onChange={(e) => handleChange('ollama_model_auditoria', e.target.value)}
-                                                    >
-                                                        {!availableModels.includes(configs.ollama_model_auditoria) && configs.ollama_model_auditoria && (
-                                                            <option value={configs.ollama_model_auditoria}>{configs.ollama_model_auditoria} (actual)</option>
-                                                        )}
-                                                        {availableModels.map(m => (
-                                                            <option key={`auditoria-${m}`} value={m}>{m}</option>
-                                                        ))}
-                                                        <option value="manual">+ Escriure manualment...</option>
-                                                    </select>
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => fetchModels()}
-                                                        className="btn btn-square btn-ghost"
-                                                        disabled={loadingModels}
-                                                    >
-                                                        <RefreshCw size={18} className={loadingModels ? 'animate-spin' : ''} />
-                                                    </button>
-                                                </div>
-                                                {configs.ollama_model_auditoria === 'manual' && (
-                                                    <input 
-                                                        type="text" 
-                                                        className="input input-bordered w-full mt-2" 
-                                                        placeholder="Nom del model (ex: llama3)"
-                                                        onBlur={(e) => {
-                                                            if (e.target.value) handleChange('ollama_model_auditoria', e.target.value);
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium text-slate-700">Nivell de raonament (think)</label>
-                                            <select 
-                                                className="select select-bordered w-full"
-                                                value={configs.ollama_think}
-                                                onChange={(e) => handleChange('ollama_think', e.target.value)}
-                                            >
-                                                <option value="smart">Smart (Automàtic segons model)</option>
-                                                <option value="none">Cap (Ometre paràmetre)</option>
-                                                <option value="false">Desactivat (think: false)</option>
-                                                <option value="low">Baix (think: low)</option>
-                                                <option value="medium">Mitjà (think: medium)</option>
-                                                <option value="high">Alt (think: high)</option>
-                                            </select>
-                                            <p className="text-xs text-slate-400">Controla la fase de "raonament" en models compatibles (Ollama R1, GPT-OSS, etc).</p>
-                                        </div>
-                                    </div>
-                                </div>
 
                                 {/* Save Button */}
                                 <div className="flex flex-col items-end gap-3 mt-6">
@@ -417,6 +316,233 @@ export default function ConfiguracionPage() {
                         </div>
                         
                         {personnelTab === 'employees' ? <Empleados /> : <Departamentos />}
+                    </div>
+                )}
+                {activeTab === 'ai' && isAdmin && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        {/* Selector de Proveïdor */}
+                        <div className="glass-card p-6">
+                            <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles size={20} className="text-primary-500" />
+                                    <h2>Proveïdor d'IA actiu</h2>
+                                </div>
+                                <label className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only" 
+                                            checked={configs.ia_enabled === 'true'}
+                                            onChange={(e) => handleChange('ia_enabled', e.target.checked ? 'true' : 'false')}
+                                        />
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${configs.ia_enabled === 'true' ? 'bg-purple-500' : 'bg-slate-300'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.ia_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                    <span className="ml-3 text-sm font-medium text-slate-700">Mòduls IA Actius</span>
+                                </label>
+                            </div>
+                            
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 ${configs.ia_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="space-y-4">
+                                    <label className="text-sm font-medium text-slate-700">Selecciona el motor de raonament</label>
+                                    <div className="flex gap-4">
+                                        <button 
+                                            onClick={() => handleChange('ai_provider', 'ollama')}
+                                            className={`flex-1 p-4 rounded-xl border-2 transition-all text-center space-y-2 ${
+                                                configs.ai_provider === 'ollama' 
+                                                ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-md transform scale-[1.02]' 
+                                                : 'border-slate-100 hover:border-slate-300 text-slate-500'
+                                            }`}
+                                        >
+                                            <div className="flex justify-center"><Terminal size={32} /></div>
+                                            <div className="font-bold">Ollama</div>
+                                            <div className="text-xs">Motor Local (Privacitat total)</div>
+                                        </button>
+                                        <button 
+                                            onClick={() => handleChange('ai_provider', 'gemini')}
+                                            className={`flex-1 p-4 rounded-xl border-2 transition-all text-center space-y-2 ${
+                                                configs.ai_provider === 'gemini' 
+                                                ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-md transform scale-[1.02]' 
+                                                : 'border-slate-100 hover:border-slate-300 text-slate-500'
+                                            }`}
+                                        >
+                                            <div className="flex justify-center"><Bot size={32} /></div>
+                                            <div className="font-bold">Gemini (Google)</div>
+                                            <div className="text-xs">Motor Cloud (Màxima potència)</div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-3 mt-auto">
+                                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600 mt-1"><Sparkles size={18} /></div>
+                                    <p className="text-xs text-slate-600 leading-relaxed">
+                                        Pots alternar entre proveïdors en qualsevol moment. Ollama s'executa al teu propi servidor, mentre que Gemini requereix una connexió a Internet i una clau API de Google.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Configuració segons proveïdor */}
+                        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${configs.ia_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                            {/* Ollama Section */}
+                            <div className={`glass-card p-6 border-l-4 ${configs.ai_provider === 'ollama' ? 'border-l-primary-500 bg-primary-50/10' : 'border-l-slate-200'}`}>
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Terminal size={18} className="text-primary-500" />
+                                    <h3 className="font-bold text-slate-800 uppercase tracking-wider text-sm">Paràmetres Ollama</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">URL del Servidor</label>
+                                        <input 
+                                            type="text"
+                                            className="input input-sm input-bordered w-full"
+                                            value={configs.ollama_url}
+                                            onChange={(e) => handleChange('ollama_url', e.target.value)}
+                                            placeholder="http://localhost:11434"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">Model per Classificació CPV</label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className="select select-sm select-bordered w-full"
+                                                value={configs.ollama_model_cpv}
+                                                onChange={(e) => handleChange('ollama_model_cpv', e.target.value)}
+                                            >
+                                                {availableModels.map(m => (
+                                                    <option key={`cpv-${m}`} value={m}>{m}</option>
+                                                ))}
+                                                <option value="llama3">llama3 (default)</option>
+                                            </select>
+                                            <button type="button" onClick={() => fetchModels()} className="btn btn-xs btn-ghost">
+                                                <RefreshCw size={14} className={loadingModels ? 'animate-spin' : ''} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">Nivell de Raonament (Think)</label>
+                                        <select 
+                                            className="select select-sm select-bordered w-full"
+                                            value={configs.ollama_think}
+                                            onChange={(e) => handleChange('ollama_think', e.target.value)}
+                                        >
+                                            <option value="smart">Automàtic (Smart)</option>
+                                            <option value="none">Cap</option>
+                                            <option value="false">Desactivat</option>
+                                            <option value="high">Alt</option>
+                                            <option value="medium">Mitjà</option>
+                                            <option value="low">Baix</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Gemini Section */}
+                            <div className={`glass-card p-6 border-l-4 ${configs.ai_provider === 'gemini' ? 'border-l-purple-500 bg-purple-50/10' : 'border-l-slate-200'}`}>
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Bot size={18} className="text-purple-500" />
+                                    <h3 className="font-bold text-slate-800 uppercase tracking-wider text-sm">Paràmetres Gemini</h3>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">Google API Key</label>
+                                        <input 
+                                            type="password"
+                                            className="input input-sm input-bordered w-full"
+                                            value={configs.gemini_api_key}
+                                            onChange={(e) => handleChange('gemini_api_key', e.target.value)}
+                                            placeholder="AIza..."
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">Model Gemini</label>
+                                        <select 
+                                            className="select select-sm select-bordered w-full"
+                                            value={configs.gemini_model}
+                                            onChange={(e) => handleChange('gemini_model', e.target.value)}
+                                        >
+                                            <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ràpid i gratuït)</option>
+                                            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Més intel·ligent)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Edició de Prompts */}
+                        <div className={`glass-card p-6 ${configs.ia_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4">
+                                <MessageSquare size={20} className="text-primary-500" />
+                                <h2>Gestió de Prompts</h2>
+                            </div>
+                            <div className="grid grid-cols-1 gap-8">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">1</div>
+                                            <h3 className="font-medium text-slate-700">Classificació CPV (Objecte → Paraules Clau)</h3>
+                                        </div>
+                                    </div>
+                                    <textarea 
+                                        className="textarea textarea-bordered w-full font-mono text-sm leading-relaxed bg-slate-50" 
+                                        rows={6}
+                                        value={configs.prompt_cpv_extract}
+                                        onChange={(e) => handleChange('prompt_cpv_extract', e.target.value)}
+                                    ></textarea>
+                                    <p className="text-xs text-slate-400">Variable disponible: <code>{'{description}'}</code></p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-sm">2</div>
+                                            <h3 className="font-medium text-slate-700">Classificació CPV (Rànquing de Candidats)</h3>
+                                        </div>
+                                    </div>
+                                    <textarea 
+                                        className="textarea textarea-bordered w-full font-mono text-sm leading-relaxed bg-slate-50" 
+                                        rows={6}
+                                        value={configs.prompt_cpv_rank}
+                                        onChange={(e) => handleChange('prompt_cpv_rank', e.target.value)}
+                                    ></textarea>
+                                    <p className="text-xs text-slate-400">Variables: <code>{'{description}'}</code>, <code>{'{candidates}'}</code></p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm">3</div>
+                                            <h3 className="font-medium text-slate-700">Anàlisi d'Auditoria (Informe de Risc)</h3>
+                                        </div>
+                                    </div>
+                                    <textarea 
+                                        className="textarea textarea-bordered w-full font-mono text-sm leading-relaxed bg-slate-50" 
+                                        rows={6}
+                                        value={configs.prompt_auditoria}
+                                        onChange={(e) => handleChange('prompt_auditoria', e.target.value)}
+                                    ></textarea>
+                                    <p className="text-xs text-slate-400">Variables: <code>{'{data}'}</code>, <code>{'{custom_prompt}'}</code></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Save Button IA */}
+                        <div className="flex flex-col items-end gap-3 mt-6">
+                            {message && (
+                                <div className={`text-sm px-4 py-2 rounded-lg ${
+                                    message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+                            <button 
+                                onClick={handleSave} 
+                                className="btn btn-primary px-12 gap-2 shadow-lg hover:shadow-primary-200 transition-all font-bold" 
+                                disabled={saving}
+                            >
+                                {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                                Guardar Configuració d'IA
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
