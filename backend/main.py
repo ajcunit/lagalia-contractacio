@@ -106,8 +106,8 @@ def health_check():
 app.mount("/api", api_app)
 
 # Mount frontend static files
-# In Docker, frontend files will be in backend/static/
-static_path = os.path.join(os.path.dirname(__file__), "static")
+# In local development, we point to the build output of the frontend
+static_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 if os.path.exists(static_path):
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
 

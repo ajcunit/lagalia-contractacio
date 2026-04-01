@@ -4,7 +4,7 @@ from typing import List, Optional
 from database import get_db
 import models
 import schemas
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, AuthService
 
 router = APIRouter(prefix="/empleados", tags=["empleados"])
 

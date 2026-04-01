@@ -10,7 +10,6 @@ import {
     Search,
     Settings,
     Globe,
-    ScrollText,
     Star,
     LogOut,
     Building2,
@@ -19,7 +18,11 @@ import {
     Sun,
     User,
     ChevronUp,
-    Shield
+    Shield,
+    Users,
+    Building,
+    RefreshCw,
+    ScrollText
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -67,13 +70,13 @@ export default function Sidebar() {
 
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-        { path: '/contratos', icon: FileText, label: 'Contractes' },
+        { path: '/contratacion', icon: FileText, label: 'Contractació' },
         { path: '/contratos-menores', icon: ScrollText, label: 'Contractes Menors' },
         ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' 
-            ? [{ path: '/duplicados', icon: AlertTriangle, label: 'Duplicats', badge: pendientes }] 
+            ? (pendientes > 0 ? [{ path: '/duplicados', icon: AlertTriangle, label: 'Duplicats', badge: pendientes }] : []) 
             : []),
-        { path: '/cpv', icon: Search, label: 'Buscador CPV' },
         { path: '/adjudicatarios', icon: Building2, label: 'Adjudicataris' },
+        { path: '/cpv', icon: Search, label: 'Buscador CPV' },
         { path: '/superbuscador', icon: Globe, label: 'SuperBuscador' },
         { path: '/favoritos', icon: Star, label: 'Favorits' },
         ...(user?.permiso_auditoria || user?.rol === 'admin' 
@@ -100,16 +103,24 @@ export default function Sidebar() {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-1">
+            <nav className={`flex-1 p-4 space-y-1 custom-scrollbar ${collapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
                 {navItems.map((item) => (
                     <NavLink
                         key={item.path}
                         to={item.path}
                         className={({ isActive }) =>
-                            `sidebar-link ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`
+                            `sidebar-link relative group has-tooltip ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`
                         }
                     >
                         <item.icon size={20} />
+                        
+                        {collapsed && (
+                            <div className="invisible group-hover:visible absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-white text-primary-700 text-xs font-bold rounded-lg shadow-xl border border-primary-100 whitespace-nowrap z-50 pointer-events-none animate-in fade-in slide-in-from-left-1 duration-200">
+                                {item.label}
+                                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white border-l border-b border-primary-100 rotate-45" />
+                            </div>
+                        )}
+
                         {!collapsed && (
                             <>
                                 <span className="flex-1">{item.label}</span>
@@ -144,27 +155,53 @@ export default function Sidebar() {
                             </button>
                             
                             {user?.rol === 'admin' && (
-                                <NavLink
-                                    to="/configuracion"
-                                    onClick={() => setUserMenuOpen(false)}
-                                    className={({ isActive }) =>
-                                        `sidebar-link ${isActive ? 'active' : ''}`
-                                    }
-                                >
-                                    <Settings size={18} />
-                                    <span className="flex-1">Configuració</span>
-                                </NavLink>
+                                <>
+                                    <NavLink
+                                        to="/sincronizacion"
+                                        onClick={() => setUserMenuOpen(false)}
+                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                                    >
+                                        <RefreshCw size={18} />
+                                        <span className="flex-1">Sincronització</span>
+                                    </NavLink>
+                                    <NavLink
+                                        to="/departamentos"
+                                        onClick={() => setUserMenuOpen(false)}
+                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                                    >
+                                        <Building size={18} />
+                                        <span className="flex-1">Departaments</span>
+                                    </NavLink>
+                                    <NavLink
+                                        to="/empleados"
+                                        onClick={() => setUserMenuOpen(false)}
+                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+                                    >
+                                        <Users size={18} />
+                                        <span className="flex-1">Empleats</span>
+                                    </NavLink>
+                                    <NavLink
+                                        to="/configuracion"
+                                        onClick={() => setUserMenuOpen(false)}
+                                        className={({ isActive }) =>
+                                            `sidebar-link ${isActive ? 'active' : ''}`
+                                        }
+                                    >
+                                        <Settings size={18} />
+                                        <span className="flex-1">Configuració Sistema</span>
+                                    </NavLink>
+                                </>
                             )}
 
                             {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
                                 <button
                                     onClick={toggleViewMode}
                                     className="sidebar-link w-full text-left"
-                                    title="Canvia entre veure tots els departaments o només el teu."
+                                    title={viewMode === 'admin' ? "Canvia a vista limitada al teu departament." : "Canvia a vista d'administrador (tots els departaments)."}
                                 >
                                     <Shield size={18} className={viewMode === 'admin' ? 'text-primary-600' : 'text-slate-400'} />
                                     <span className="flex-1">
-                                        Vista {viewMode === 'admin' ? 'Usuari' : 'Admin'}
+                                        {viewMode === 'admin' ? 'Activar Vista Usuari' : 'Activar Vista Admin'}
                                     </span>
                                 </button>
                             )}
@@ -214,22 +251,27 @@ export default function Sidebar() {
                         </>
                     )}
                 </button>
-                
-                {collapsed && (
+                                {collapsed && (
                     <div className="mt-2 flex flex-col gap-2">
                          <button
                             onClick={() => setIsDark(!isDark)}
-                            className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50 hover:text-primary-600 transition-all mx-auto"
-                            title={`Mode ${isDark ? 'Clar' : 'Fosc'}`}
+                            className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50 hover:text-primary-600 transition-all mx-auto relative group"
                         >
                             {isDark ? <Sun size={20} /> : <Moon size={20} />}
+                             <div className="invisible group-hover:visible absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-white text-slate-700 text-xs font-bold rounded-lg shadow-xl border border-slate-200 whitespace-nowrap z-50 pointer-events-none">
+                                Mode {isDark ? 'Clar' : 'Fosc'}
+                                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white border-l border-b border-slate-200 rotate-45" />
+                            </div>
                         </button>
                         <button
                             onClick={handleLogout}
-                            className="w-10 h-10 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-all mx-auto"
-                            title="Tancar Sessió"
+                            className="w-10 h-10 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-all mx-auto relative group"
                         >
                             <LogOut size={20} />
+                            <div className="invisible group-hover:visible absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-white text-red-600 text-xs font-bold rounded-lg shadow-xl border border-red-100 whitespace-nowrap z-50 pointer-events-none">
+                                Tancar Sessió
+                                <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white border-l border-b border-red-100 rotate-45" />
+                            </div>
                         </button>
                     </div>
                 )}

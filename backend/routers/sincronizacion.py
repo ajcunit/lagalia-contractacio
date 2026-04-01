@@ -183,10 +183,17 @@ def list_duplicados(
 
 @router.get("/duplicados/count")
 def count_duplicados_pendientes(db: Session = Depends(get_db)):
-    count = db.query(models.Duplicado).filter(
+    # Contractes duplicats
+    count_contratos = db.query(models.Duplicado).filter(
         models.Duplicado.estado_validacion == 'pendiente'
     ).count()
-    return {"pendientes": count}
+    
+    # Adjudicataris duplicats
+    count_adj = db.query(models.DuplicadoAdjudicatario).filter(
+        models.DuplicadoAdjudicatario.estado == 'pendiente'
+    ).count()
+    
+    return {"pendientes": count_contratos + count_adj}
 
 
 @router.post("/duplicados/{duplicado_id}/validar")

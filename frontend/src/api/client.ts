@@ -147,12 +147,23 @@ export interface Duplicado {
     valor_duplicado: string;
     fecha_deteccion: string;
     estado_validacion: string;
+    motivo_duplicado?: string;
     usuario_validador_id?: number;
     fecha_validacion?: string;
     accion_tomada?: string;
     observaciones?: string;
     contrato_1?: Contrato;
     contrato_2?: Contrato;
+}
+
+export interface DuplicadoAdjudicatario {
+    id: number;
+    nombre_1: string;
+    nombre_2: string;
+    nif: string;
+    motivo: string;
+    estado: string;
+    fecha_deteccion: string;
 }
 
 export interface DashboardStats {
@@ -239,6 +250,7 @@ export interface GlobalSearchResponse {
 // Adjudicatarios
 export interface Adjudicatario {
     nombre: string;
+    nif?: string;
     total_contratos: number;
     total_importe: number;
 }
@@ -454,7 +466,7 @@ class ApiClient {
     }
 
     // Contratos Menores
-    async getContratosMenores(params?: { skip?: number, limit?: number, search?: string, adjudicatari?: string, exercici?: number, recent?: boolean, departamento_id?: number, estado_interno?: string }): Promise<ContratoMenor[]> {
+    async getContratosMenores(params?: { skip?: number, limit?: number, search?: string, adjudicatari?: string, exercici?: number, recent?: boolean, departamento_id?: number, estado_interno?: string, sense_departament?: boolean }): Promise<ContratoMenor[]> {
         const query = new URLSearchParams();
         if (params) {
             if (params.skip !== undefined) query.append('skip', String(params.skip));
@@ -465,6 +477,7 @@ class ApiClient {
             if (params.recent) query.append('recent', 'true');
             if (params.departamento_id) query.append('departamento_id', String(params.departamento_id));
             if (params.estado_interno) query.append('estado_interno', params.estado_interno);
+            if (params.sense_departament) query.append('sense_departament', 'true');
         }
         return this.request<ContratoMenor[]>(`/contratos-menores/?${query.toString()}`);
     }
@@ -590,6 +603,17 @@ class ApiClient {
         return this.request<{ pendientes: number }>('/sincronizacion/duplicados/count');
     }
 
+    async getDuplicadosAdjudicatarios(): Promise<DuplicadoAdjudicatario[]> {
+        return this.request<DuplicadoAdjudicatario[]>('/adjudicatarios/duplicados/lista');
+    }
+
+    async gestionarDuplicadoAdjudicatario(id: number, accion: string): Promise<any> {
+        return this.request(`/adjudicatarios/duplicados/${id}/gestionar`, {
+            method: 'POST',
+            body: JSON.stringify({ accion })
+        });
+    }
+
     async validarDuplicado(id: number, data: { accion_tomada: string; observaciones?: string }): Promise<void> {
         return this.request(`/sincronizacion/duplicados/${id}/validar`, {
             method: 'POST',
@@ -628,15 +652,29 @@ class ApiClient {
     }
 
     // SuperBuscador
-    async searchGlobalContracts(params: { q?: string; organisme?: string; objecte?: string; limit?: number; offset?: number }): Promise<GlobalSearchResponse> {
-        const searchParams = new URLSearchParams();
-        if (params.q) searchParams.append('q', params.q);
-        if (params.organisme) searchParams.append('organisme', params.organisme);
-        if (params.objecte) searchParams.append('objecte', params.objecte);
-        if (params.limit) searchParams.append('limit', String(params.limit));
-        if (params.offset) searchParams.append('offset', String(params.offset));
+    async searchGlobalContracts(params: { 
+        q?: string; 
+        organisme?: string; 
+        objecte?: string; 
+        min_importe?: number;
+        max_importe?: number;
+        fecha_desde?: string;
+        fecha_hasta?: string;
+        limit?: number; 
+        offset?: number; 
+    }): Promise<{ results: any[]; count: number; limit: number; offset: number }> {
+        const query = new URLSearchParams();
+        if (params.q) query.append('q', params.q);
+        if (params.organisme) query.append('organisme', params.organisme);
+        if (params.objecte) query.append('objecte', params.objecte);
+        if (params.min_importe) query.append('min_importe', params.min_importe.toString());
+        if (params.max_importe) query.append('max_importe', params.max_importe.toString());
+        if (params.fecha_desde) query.append('fecha_desde', params.fecha_desde);
+        if (params.fecha_hasta) query.append('fecha_hasta', params.fecha_hasta);
+        if (params.limit) query.append('limit', params.limit.toString());
+        if (params.offset) query.append('offset', params.offset.toString());
         
-        return this.request<GlobalSearchResponse>(`/superbuscador/search?${searchParams.toString()}`);
+        return this.request<{ results: any[]; count: number; limit: number; offset: number }>(`/superbuscador/search?${query.toString()}`);
     }
 
     async getGlobalContractDetail(codi_expedient: string): Promise<any> {

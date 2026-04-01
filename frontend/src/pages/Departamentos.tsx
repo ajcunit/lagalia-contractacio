@@ -83,7 +83,11 @@ export default function Departamentos() {
                             </thead>
                             <tbody>
                                 {departamentos.map((dept) => (
-                                    <tr key={dept.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    <tr 
+                                        key={dept.id} 
+                                        className="hover:bg-slate-50 transition-colors group cursor-pointer"
+                                        onClick={() => handleOpenDetail(dept)}
+                                    >
                                         <td>
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-medium shadow-sm group-hover:scale-110 transition-transform">
@@ -110,7 +114,7 @@ export default function Departamentos() {
                                             )}
                                         </td>
                                         <td>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-primary-600 transition-colors shadow-sm bg-slate-50"
                                                     onClick={() => handleOpenDetail(dept)}

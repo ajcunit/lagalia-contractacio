@@ -14,13 +14,14 @@ router = APIRouter(prefix="/contratos-menores", tags=["contratos-menores"])
 @router.get("/", response_model=List[schemas.ContratoMenor])
 def list_contratos_menores(
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 500,
     search: Optional[str] = None,
     adjudicatari: Optional[str] = None,
     exercici: Optional[int] = None,
     recent: Optional[bool] = False,
     departamento_id: Optional[int] = None,
     estado_interno: Optional[str] = None,
+    sense_departament: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: models.Empleado = Depends(get_current_user),
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
@@ -45,7 +46,7 @@ def list_contratos_menores(
         
     if recent:
         from sqlalchemy import text
-        query = query.filter(text("data_adjudicacio >= date('now', '-1 year')"))
+        query = query.filter(text("data_adjudicacio >= CURRENT_DATE - INTERVAL '1 year'"))
 
     if departamento_id:
         query = query.filter(models.ContratoMenor.departamento_id == departamento_id)
@@ -53,10 +54,87 @@ def list_contratos_menores(
     if estado_interno:
         query = query.filter(models.ContratoMenor.estado_interno == estado_interno)
 
+    if sense_departament is not None:
+        if sense_departament:
+            query = query.filter(models.ContratoMenor.departamento_id.is_(None))
+        else:
+            query = query.filter(models.ContratoMenor.departamento_id.isnot(None))
+
     total = query.count()
     contratos = query.order_by(models.ContratoMenor.data_adjudicacio.desc().nullslast()).offset(skip).limit(limit).all()
     
     return contratos
+
+@router.get("/export/csv")
+def export_menores_csv(
+    search: Optional[str] = None,
+    adjudicatari: Optional[str] = None,
+    exercici: Optional[int] = None,
+    recent: Optional[bool] = False,
+    departamento_id: Optional[int] = None,
+    estado_interno: Optional[str] = None,
+    sense_departament: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user),
+    x_view_mode: str = Header(alias="X-View-Mode", default="user")
+):
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+    
+    query = db.query(models.ContratoMenor)
+    query = apply_department_filter(query, models.ContratoMenor, current_user, x_view_mode)
+    
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.ContratoMenor.codi_expedient.ilike(search_filter),
+                models.ContratoMenor.descripcio_expedient.ilike(search_filter)
+            )
+        )
+    if adjudicatari:
+        query = query.filter(models.ContratoMenor.adjudicatari.ilike(f"%{adjudicatari}%"))
+    if exercici:
+        query = query.filter(models.ContratoMenor.exercici == exercici)
+    if recent:
+        from sqlalchemy import text
+        query = query.filter(text("data_adjudicacio >= CURRENT_DATE - INTERVAL '1 year'"))
+    if departamento_id:
+        query = query.filter(models.ContratoMenor.departamento_id == departamento_id)
+    if estado_interno:
+        query = query.filter(models.ContratoMenor.estado_interno == estado_interno)
+    if sense_departament is not None:
+        if sense_departament:
+            query = query.filter(models.ContratoMenor.departamento_id.is_(None))
+        else:
+            query = query.filter(models.ContratoMenor.departamento_id.isnot(None))
+
+    contratos = query.all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_ALL)
+    
+    writer.writerow(["Expedient", "Descripció", "Tipus", "Adjudicatari", "Import", "Exercici", "Liquidació", "Estat Intern"])
+    
+    for c in contratos:
+        writer.writerow([
+            c.codi_expedient,
+            c.descripcio_expedient,
+            c.tipus_contracte,
+            c.adjudicatari,
+            c.import_adjudicacio,
+            c.exercici,
+            c.tipus_liquidacio,
+            c.estado_interno
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=menors.csv"}
+    )
 
 @router.get("/{id}", response_model=schemas.ContratoMenor)
 def get_contrato_menor(id: int, db: Session = Depends(get_db)):

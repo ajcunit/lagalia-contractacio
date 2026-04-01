@@ -44,19 +44,20 @@ def get_adjudicatarios(
 
     query = f"""
     WITH combined AS (
-        SELECT adjudicatari_nom as nombre, import_adjudicacio_amb_iva as importe
+        SELECT adjudicatari_nom as nombre, import_adjudicacio_amb_iva as importe, adjudicatari_nif as nif
         FROM contratos
         WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter}
         
         UNION ALL
         
-        SELECT adjudicatari as nombre, import_adjudicacio as importe
+        SELECT adjudicatari as nombre, import_adjudicacio as importe, NULL as nif
         FROM contratos_menores
         WHERE adjudicatari IS NOT NULL AND adjudicatari != '' {dept_filter}
     ),
     grouped AS (
         SELECT 
             nombre,
+            MAX(nif) as nif,
             COUNT(*) as total_contratos,
             SUM(importe) as total_importe
         FROM combined
@@ -149,3 +150,64 @@ def get_adjudicatario_detalle(
         "total_importe": total_importe,
         "contratos": [dict(r) for r in results]
     }
+
+
+import schemas
+
+
+@router.get("/duplicados/lista", response_model=List[schemas.DuplicadoAdjudicatario])
+def list_duplicados_adjudicataris(db: Session = Depends(get_db)):
+    """Llista els duplicats d'adjudicataris pendents"""
+    return db.query(models.DuplicadoAdjudicatario).filter(
+        models.DuplicadoAdjudicatario.estado == 'pendiente'
+    ).order_by(models.DuplicadoAdjudicatario.fecha_deteccion.desc()).all()
+
+
+@router.post("/duplicados/{dup_id}/gestionar")
+def gestionar_duplicado_adjudicatario(
+    dup_id: int,
+    gestion: schemas.DuplicadoAdjudicatarioGestion,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    """Fusiona o rebutja un duplicat d'adjudicatari"""
+    if current_user.rol not in ["admin", "responsable_contratacion"]:
+        raise HTTPException(status_code=403, detail="No tens permissos")
+
+    dup = db.query(models.DuplicadoAdjudicatario).filter(models.DuplicadoAdjudicatario.id == dup_id).first()
+    if not dup:
+        raise HTTPException(status_code=404, detail="No trobat")
+
+    accion = gestion.accion
+    if accion == "rechazar":
+        dup.estado = "rechazado"
+        db.commit()
+        return {"message": "Duplicat marcat com a diferent (rebutjat)"}
+
+    # Fusionar
+    canonico = dup.nombre_1 if accion == "fusionar_1" else dup.nombre_2
+    original = dup.nombre_2 if accion == "fusionar_1" else dup.nombre_1
+
+    # 1. Crear àlies permanent (o actualitzar si ja existia)
+    alias = db.query(models.AliasAdjudicatario).filter(models.AliasAdjudicatario.nombre_original == original).first()
+    if not alias:
+        alias = models.AliasAdjudicatario(nombre_original=original, nombre_canonico=canonico)
+        db.add(alias)
+    else:
+        alias.nombre_canonico = canonico
+
+    # 2. Actualitzar contractes existents (Majors)
+    db.query(models.Contrato).filter(models.Contrato.adjudicatari_nom == original).update(
+        {models.Contrato.adjudicatari_nom: canonico}, synchronize_session=False
+    )
+
+    # 3. Actualitzar contractes menors
+    db.query(models.ContratoMenor).filter(models.ContratoMenor.adjudicatari == original).update(
+        {models.ContratoMenor.adjudicatari: canonico}, synchronize_session=False
+    )
+
+    # 4. Marcar duplicat com a fusionat
+    dup.estado = "fusionado"
+    
+    db.commit()
+    return {"message": f"Fusió realitzada correctament a '{canonico}'."}

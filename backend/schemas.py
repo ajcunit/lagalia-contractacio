@@ -241,6 +241,7 @@ class DuplicadoBase(BaseModel):
     contrato_id_2: int
     campo_duplicado: str
     valor_duplicado: str
+    motivo_duplicado: Optional[str] = None
 
 
 class DuplicadoCreate(DuplicadoBase):
@@ -263,6 +264,23 @@ class Duplicado(DuplicadoBase):
 
     class Config:
         from_attributes = True
+
+
+class DuplicadoAdjudicatario(BaseModel):
+    id: int
+    nombre_1: str
+    nombre_2: str
+    nif: Optional[str]
+    motivo: Optional[str]
+    estado: str
+    fecha_deteccion: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DuplicadoAdjudicatarioGestion(BaseModel):
+    accion: str  # 'fusionar_1', 'fusionar_2', 'rechazar'
 
 
 class DuplicadoConContratos(Duplicado):

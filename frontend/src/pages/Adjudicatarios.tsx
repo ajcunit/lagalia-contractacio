@@ -116,20 +116,25 @@ export default function Adjudicatarios() {
                         <table className="table border-collapse w-full">
                             <thead className="bg-slate-50 sticky top-0 z-10">
                                 <tr>
-                                    <th onClick={() => handleSort('nombre')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <th className="px-6 py-4 text-left">
+                                        <div className="flex items-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
+                                            CIF/NIF
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('nombre')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-left">
+                                        <div className="flex items-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
                                             Nom de l'Empresa
                                             {sortBy === 'nombre' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
                                         </div>
                                     </th>
                                     <th onClick={() => handleSort('total_contratos')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-center">
-                                        <div className="flex items-center justify-center gap-2">
+                                        <div className="flex items-center justify-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
                                             Nº Contractes
                                             {sortBy === 'total_contratos' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
                                         </div>
                                     </th>
                                     <th onClick={() => handleSort('total_importe')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
+                                        <div className="flex items-center justify-end gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
                                             Volum Adjudicat
                                             {sortBy === 'total_importe' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
                                         </div>
@@ -143,6 +148,11 @@ export default function Adjudicatarios() {
                                         onClick={() => navigate(`/adjudicatarios/${btoa(encodeURIComponent(emp.nombre)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`)}
                                         className="hover:bg-slate-50/80 cursor-pointer group"
                                     >
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-medium text-slate-600">
+                                                {emp.nif || '—'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4">
                                             <span className="font-semibold text-slate-800 group-hover:text-primary-700 transition-colors">
                                                 {emp.nombre}

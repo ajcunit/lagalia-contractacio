@@ -13,7 +13,11 @@ async def search_global_contracts(
     q: Optional[str] = Query(None, description="Cerca global de text"),
     organisme: Optional[str] = Query(None, description="Nom de l'organisme"),
     objecte: Optional[str] = Query(None, description="Paraules clau en l'objecte"),
-    limit: int = Query(50, ge=1, le=100),
+    min_importe: Optional[float] = Query(None, description="Import adjudicació mínim"),
+    max_importe: Optional[float] = Query(None, description="Import adjudicació màxim"),
+    fecha_desde: Optional[str] = Query(None, description="Data publicació des de (YYYY-MM-DD)"),
+    fecha_hasta: Optional[str] = Query(None, description="Data publicació fins a (YYYY-MM-DD)"),
+    limit: int = Query(24, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ):
@@ -21,28 +25,39 @@ async def search_global_contracts(
     Cerca contractes directament a l'API de la Generalitat (Socrata)
     sense filtre d'organisme local.
     """
-    # Get the base URL from config or use default
     base_url = SyncService.get_config_val(db, "sync_api_url", SyncService.DEFAULT_API_BASE_URL)
     
-    # Build SoQL query
-    # The dataset is ybgg-dgi6
+    # Build $q (global text search)
+    # Combining the main 'q' with 'organisme' and 'objecte' for a more powerful search
+    search_terms = []
+    if q: search_terms.append(q)
+    if organisme: search_terms.append(organisme)
+    if objecte: search_terms.append(objecte)
     
-    where_clauses = []
-    
-    if organisme:
-        where_clauses.append(f"nom_organ like '%{organisme.upper()}%'")
-    
-    if objecte:
-        where_clauses.append(f"objecte_contracte like '%{objecte}%'")
-        
     query_params = {
         "$limit": limit,
         "$offset": offset,
-        "$order": "data_publicacio_contracte DESC"
+        "$order": "data_publicacio_anunci DESC"
     }
     
-    if q:
-        query_params["$q"] = q
+    if search_terms:
+        query_params["$q"] = " ".join(search_terms)
+        
+    where_clauses = []
+    
+    # Use numeric filters in $where (only for numbers)
+    # Using pressupost_licitacio_amb which is a verified Number field in this dataset
+    if min_importe is not None:
+        where_clauses.append(f"pressupost_licitacio_amb >= {int(min_importe)}")
+    
+    if max_importe is not None:
+        where_clauses.append(f"pressupost_licitacio_amb <= {int(max_importe)}")
+        
+    if fecha_desde:
+        where_clauses.append(f"data_publicacio_anunci >= '{fecha_desde}T00:00:00'")
+        
+    if fecha_hasta:
+        where_clauses.append(f"data_publicacio_anunci <= '{fecha_hasta}T23:59:59'")
         
     if where_clauses:
         query_params["$where"] = " AND ".join(where_clauses)
@@ -50,16 +65,25 @@ async def search_global_contracts(
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(base_url, params=query_params, timeout=30.0)
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                detail = response.text
+                try:
+                    detail = response.json().get("message", detail)
+                except:
+                    pass
+                raise HTTPException(status_code=response.status_code, detail=f"Error API Generalitat: {detail}")
+
             data = response.json()
             
-            # Enrich data if needed? For now just return it
             return {
                 "results": data,
                 "count": len(data),
                 "limit": limit,
                 "offset": offset
             }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en cercar a l'API externa: {str(e)}")
 

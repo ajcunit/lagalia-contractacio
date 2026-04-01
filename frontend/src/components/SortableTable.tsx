@@ -75,11 +75,11 @@ export function SortableTh({ label, sortKey, sortConfig, onSort, className = '' 
 
     return (
         <th
-            className={`cursor-pointer select-none group ${className}`}
+            className={`px-4 py-3 bg-slate-50 border-b border-slate-100 cursor-pointer select-none group uppercase tracking-wider text-[11px] font-bold text-slate-500 ${className}`}
             onClick={() => onSort(sortKey)}
             title={`Ordenar per ${label}`}
         >
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 justify-start">
                 <span>{label}</span>
                 <span className={`transition-all duration-200 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
                     {isActive && sortConfig.direction === 'asc' ? (

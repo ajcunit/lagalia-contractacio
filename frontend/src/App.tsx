@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Contratos from './pages/Contratos';
+import Contratacion from './pages/Contratacion';
 import ContratoDetalle from './pages/ContratoDetalle';
 import Duplicados from './pages/Duplicados';
 import Sincronizacion from './pages/Sincronizacion';
@@ -33,6 +34,7 @@ function App() {
                     <Route path="/" element={<Layout />}>
                         <Route index element={<Navigate to="/dashboard" replace />} />
                         <Route path="dashboard" element={<Dashboard />} />
+                        <Route path="contratacion" element={<Contratacion />} />
                         <Route path="contratos" element={<Contratos />} />
                         <Route path="contratos/:id" element={<ContratoDetalle />} />
                         <Route path="duplicados" element={<Duplicados />} />

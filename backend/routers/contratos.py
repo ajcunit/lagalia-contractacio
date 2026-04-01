@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, desc, nulls_last
 from typing import List, Optional, Dict
 from datetime import date, datetime
 from database import get_db
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/contratos", tags=["contratos"])
 @router.get("/", response_model=List[schemas.ContratoListItem])
 def list_contratos(
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 500,
     estat_actual: Optional[str] = None,
     tipus_contracte: Optional[str] = None,
     procediment: Optional[str] = None,
@@ -32,6 +32,7 @@ def list_contratos(
     te_prorroga: Optional[bool] = None,
     alerta_finalitzacio: Optional[bool] = None,
     possiblement_finalitzat: Optional[bool] = None,
+    sense_departament: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: models.Empleado = Depends(get_current_user),
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
@@ -85,6 +86,11 @@ def list_contratos(
         query = query.filter(models.Contrato.alerta_finalitzacio == alerta_finalitzacio)
     if possiblement_finalitzat is not None:
         query = query.filter(models.Contrato.possiblement_finalitzat == possiblement_finalitzat)
+    if sense_departament is not None:
+        if sense_departament:
+            query = query.filter(models.Contrato.departamento_id.is_(None))
+        else:
+            query = query.filter(models.Contrato.departamento_id.isnot(None))
     if busqueda:
         search_term = f"%{busqueda}%"
         query = query.filter(
@@ -172,7 +178,7 @@ def get_dashboard_stats(
     ).group_by(
         models.Contrato.adjudicatari_nom
     ).order_by(
-        func.sum(models.Contrato.import_adjudicacio_amb_iva).desc()
+        nulls_last(desc(func.sum(models.Contrato.import_adjudicacio_amb_iva)))
     ).limit(10).all()
     
     top_adjudicatarios = [
@@ -233,6 +239,98 @@ async def get_cpv_info(codes: str = Query("")):
         return {}
         
     return await get_cpv_descriptions(code_list)
+
+
+@router.get("/export/csv")
+def export_contratos_csv(
+    busqueda: Optional[str] = None,
+    te_prorroga: Optional[bool] = None,
+    alerta_finalitzacio: Optional[bool] = None,
+    possiblement_finalitzat: Optional[bool] = None,
+    sense_departament: Optional[bool] = None,
+    departamento_id: Optional[int] = None,
+    estat_actual: Optional[str] = None,
+    tipus_contracte: Optional[str] = None,
+    estado_interno: Optional[str] = None,
+    adjudicatari_nom: Optional[str] = None,
+    fecha_inicio_desde: Optional[str] = None,
+    fecha_inicio_hasta: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    from fastapi.responses import StreamingResponse
+    import csv
+    import io
+    
+    query = db.query(models.Contrato)
+    
+    # Reutilitzem exactament la mateixa lògica de filtratge que el GET /
+    from services.access_control import apply_department_filter
+    query = apply_department_filter(query, models.Contrato, current_user, "admin") # CSV sempre és admin view o filtrem? Millor respectar permisos
+    
+    if estat_actual:
+        query = query.filter(models.Contrato.estat_actual == estat_actual)
+    if tipus_contracte:
+        query = query.filter(models.Contrato.tipus_contracte == tipus_contracte)
+    if estado_interno:
+        query = query.filter(models.Contrato.estado_interno == estado_interno)
+    if adjudicatari_nom:
+        query = query.filter(models.Contrato.adjudicatari_nom.ilike(f"%{adjudicatari_nom}%"))
+    if departamento_id:
+        query = query.filter(models.Contrato.departamento_id == departamento_id)
+    if alerta_finalitzacio is not None:
+        query = query.filter(models.Contrato.alerta_finalitzacio == alerta_finalitzacio)
+    if possiblement_finalitzat is not None:
+        query = query.filter(models.Contrato.possiblement_finalitzat == possiblement_finalitzat)
+    if te_prorroga is not None:
+        query = query.filter(models.Contrato.te_prorroga == te_prorroga)
+    if sense_departament is not None:
+        if sense_departament:
+            query = query.filter(models.Contrato.departamento_id.is_(None))
+        else:
+            query = query.filter(models.Contrato.departamento_id.isnot(None))
+    
+    if fecha_inicio_desde:
+        query = query.filter(models.Contrato.data_inici >= fecha_inicio_desde)
+    if fecha_inicio_hasta:
+        query = query.filter(models.Contrato.data_inici <= fecha_inicio_hasta)
+            
+    if busqueda:
+        search_term = f"%{busqueda}%"
+        query = query.filter(
+            or_(
+                models.Contrato.codi_expedient.ilike(search_term),
+                models.Contrato.objecte_contracte.ilike(search_term),
+                models.Contrato.adjudicatari_nom.ilike(search_term)
+            )
+        )
+    
+    contratos = query.all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_ALL)
+    
+    # Header
+    writer.writerow(["Expedient", "Objecte", "Tipus", "Adjudicatari", "Import amb IVA", "Data Inici", "Estat", "Estat Intern"])
+    
+    for c in contratos:
+        writer.writerow([
+            c.codi_expedient,
+            c.objecte_contracte,
+            c.tipus_contracte,
+            c.adjudicatari_nom,
+            c.import_adjudicacio_amb_iva,
+            c.data_inici,
+            c.estat_actual,
+            c.estado_interno
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=contractes.csv"}
+    )
 
 
 @router.get("/{contrato_id}", response_model=schemas.Contrato)

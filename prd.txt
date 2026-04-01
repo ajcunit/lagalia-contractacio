@@ -1,0 +1,670 @@
+PRD ACTUALIZADO - Sistema de Gestión de Contratos Públicos
+1. Visión General
+Sistema de gestión para visualizar y administrar información de contratos públicos provenientes de la API de Transparència Catalunya, permitiendo a departamentos y sus empleados gestionar contratos asociados mediante sincronización local.
+2. Objetivos del Producto
+
+Centralizar la información de contratos públicos en una base de datos local
+Permitir gestión departamental de contratos y personal
+Detectar automáticamente duplicados para validación manual
+Sincronizar datos periódicamente sin consultar la API en cada operación
+
+3. Usuarios Objetivo
+
+Responsables de Departamento: Gestionan empleados y validan contratos
+Empleados: Consultan contratos asociados a su departamento
+Administradores del Sistema: Dan de alta departamentos y gestionan sincronizaciones
+
+4. Funcionalidades Principales
+4.1 Gestión de Departamentos
+Alta de Departamentos
+
+Crear departamentos con información básica (nombre, código, descripción)
+Asignar responsable/s al departamento
+Desactivar/activar departamentos
+
+Gestión de Empleados
+
+Añadir empleados a departamentos
+Asignar roles (responsable, empleado)
+Modificar asignaciones departamentales
+
+4.2 Sincronización de Datos
+Proceso de Sincronización
+
+Consulta periódica al endpoint de la API
+Comparación con datos locales existentes (usando hash del registro completo)
+Detección de cambios (INSERT, UPDATE, DELETE)
+Actualización incremental de la base de datos
+
+Detección de Duplicados
+
+Identificar contratos con mismo codi_expedient Y mismo estat_actual
+Marcar automáticamente como "Pendiente de Aprobación"
+Notificar a responsables del departamento
+
+Configuración
+
+Frecuencia de sincronización (manual, horaria, diaria)
+Log de sincronizaciones (fecha, registros modificados, errores)
+Rollback en caso de errores críticos
+Filtrado por codi_ine10 si se gestionan múltiples entidades
+
+Campos de Control de Sincronización
+
+data_actualitzacio: para detectar cambios desde última sincronización
+data_publicacio: para ordenar cronológicamente
+Hash MD5 del registro completo para detectar modificaciones
+
+4.3 Gestión de Contratos
+Visualización
+
+Listado de contratos por departamento
+Filtros disponibles:
+
+Estado: estat_actual
+Tipo de contrato: tipus_contracte
+Procedimiento: procediment
+Rango de fechas: data_inici, data_final
+Rango de importes: preu_licitar, preu_adjudicar
+Adjudicatario: adjudicatari_nom
+CPV: cpv_principal_codi, cpv_principal_descripcio
+
+
+Búsqueda por: número expediente, objeto, adjudicatario
+Detalle completo del contrato con todos los campos
+
+Campos Clave a Mostrar en Listado
+
+codi_expedient
+objecte_contracte
+adjudicatari_nom
+preu_adjudicar / import_adjudicacio_amb_iva
+data_inici / data_final
+estat_actual
+departament_adjudicador (para asociación automática)
+
+Estados de Contrato
+
+Estados originales: usar campo estat_actual de la API
+Pendiente de Aprobación: Duplicados detectados
+Aprobado: Validado manualmente por responsable
+Rechazado: Descartado tras validación
+
+Validación Manual
+
+Panel de contratos pendientes de aprobación
+Comparativa lado a lado mostrando:
+
+Diferencias en importes (preu_licitar vs preu_adjudicar)
+Diferencias en fechas
+Diferencias en adjudicatarios
+Todos los campos data_* para tracking temporal
+
+
+Acciones: Aprobar, Rechazar, Fusionar
+Comentarios y observaciones
+
+4.4 Asociación Contratos-Departamentos
+Reglas de Asociación Automática
+
+Por campo departament_adjudicador (mapeo directo)
+Por campo organisme_adjudicador (mapeo a departamento)
+Por palabras clave en objecte_contracte
+Por código CPV (cpv_principal_codi)
+
+Reglas de Asociación Manual
+
+Reasignar contratos entre departamentos
+Historial de reasignaciones
+Justificación obligatoria
+
+5. Modelo de Datos Actualizado
+5.1 Entidades Principales
+sql-- Departamentos
+CREATE TABLE departamentos (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    nombre VARCHAR(255) NOT NULL,
+    descripcion TEXT,
+    activo BOOLEAN DEFAULT true,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Empleados
+CREATE TABLE empleados (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    departamento_id INTEGER REFERENCES departamentos(id),
+    rol VARCHAR(50) CHECK (rol IN ('responsable', 'empleado')),
+    activo BOOLEAN DEFAULT true,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Contratos (estructura completa de la API)
+CREATE TABLE contratos (
+    id SERIAL PRIMARY KEY,
+    
+    -- Identificadores
+    codi_expedient VARCHAR(255) NOT NULL,
+    codi_ine10 VARCHAR(50),
+    codi_dir3 VARCHAR(50),
+    
+    -- Información básica
+    objecte_contracte TEXT,
+    tipus_contracte VARCHAR(255),
+    procediment VARCHAR(255),
+    estat_actual VARCHAR(255),
+    
+    -- Adjudicación
+    adjudicatari_nom VARCHAR(500),
+    adjudicatari_nif VARCHAR(50),
+    adjudicatari_nacionalitat VARCHAR(100),
+    
+    -- Organismo
+    organisme_adjudicador VARCHAR(500),
+    departament_adjudicador VARCHAR(500),
+    
+    -- Importes
+    preu_licitar DECIMAL(15,2),
+    preu_adjudicar DECIMAL(15,2),
+    import_adjudicacio_amb_iva DECIMAL(15,2),
+    import_licitar_sense_iva DECIMAL(15,2),
+    
+    -- Fechas de tramitación
+    data_publicacio DATE,
+    data_actualitzacio TIMESTAMP,
+    data_inici DATE,
+    data_final DATE,
+    data_formalitzacio DATE,
+    
+    -- Fechas de anuncios
+    data_anunci_previ DATE,
+    data_anunci_licitacio DATE,
+    data_anunci_adjudicacio DATE,
+    data_anunci_formalitzacio DATE,
+    
+    -- CPV (Clasificación)
+    cpv_principal_codi VARCHAR(50),
+    cpv_principal_descripcio TEXT,
+    
+    -- URLs y documentación
+    enllac_anunci_previ TEXT,
+    enllac_licitacio TEXT,
+    enllac_adjudicacio TEXT,
+    enllac_formalitzacio TEXT,
+    enllac_perfil_contractant TEXT,
+    url_plataforma_contractacio TEXT,
+    
+    -- Otros campos
+    lots VARCHAR(10),
+    tipus_tramitacio VARCHAR(100),
+    codi_nuts VARCHAR(50),
+    descripcio_nuts TEXT,
+    forma_financament VARCHAR(255),
+    
+    -- Control interno
+    departamento_id INTEGER REFERENCES departamentos(id),
+    estado_interno VARCHAR(50) CHECK (estado_interno IN ('normal', 'pendiente_aprobacion', 'aprobado', 'rechazado')),
+    datos_json JSONB, -- Almacena el JSON completo de la API
+    hash_contenido VARCHAR(32), -- MD5 para detectar cambios
+    fecha_primera_sincronizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_ultima_sincronizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Índices
+    CONSTRAINT unique_expediente_estado UNIQUE (codi_expedient, estat_actual)
+);
+
+-- Índices para optimizar búsquedas
+CREATE INDEX idx_contratos_expedient ON contratos(codi_expedient);
+CREATE INDEX idx_contratos_estado_actual ON contratos(estat_actual);
+CREATE INDEX idx_contratos_departamento ON contratos(departamento_id);
+CREATE INDEX idx_contratos_adjudicatari ON contratos(adjudicatari_nom);
+CREATE INDEX idx_contratos_fecha_inicio ON contratos(data_inici);
+CREATE INDEX idx_contratos_cpv ON contratos(cpv_principal_codi);
+CREATE INDEX idx_contratos_hash ON contratos(hash_contenido);
+CREATE INDEX idx_contratos_estado_interno ON contratos(estado_interno);
+
+-- Sincronizaciones
+CREATE TABLE sincronizaciones (
+    id SERIAL PRIMARY KEY,
+    fecha_hora_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_hora_fin TIMESTAMP,
+    registros_nuevos INTEGER DEFAULT 0,
+    registros_actualizados INTEGER DEFAULT 0,
+    registros_sin_cambios INTEGER DEFAULT 0,
+    estado VARCHAR(50) CHECK (estado IN ('en_proceso', 'exitosa', 'fallida', 'parcial')),
+    log_errores TEXT,
+    url_endpoint TEXT,
+    total_registros_api INTEGER,
+    CONSTRAINT chk_fechas CHECK (fecha_hora_fin IS NULL OR fecha_hora_fin >= fecha_hora_inicio)
+);
+
+-- Duplicados detectados
+CREATE TABLE duplicados (
+    id SERIAL PRIMARY KEY,
+    contrato_id_1 INTEGER REFERENCES contratos(id) ON DELETE CASCADE,
+    contrato_id_2 INTEGER REFERENCES contratos(id) ON DELETE CASCADE,
+    campo_duplicado VARCHAR(100), -- 'codi_expedient'
+    valor_duplicado VARCHAR(500),
+    fecha_deteccion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado_validacion VARCHAR(50) CHECK (estado_validacion IN ('pendiente', 'aprobado', 'rechazado', 'fusionado')),
+    usuario_validador_id INTEGER REFERENCES empleados(id),
+    fecha_validacion TIMESTAMP,
+    accion_tomada VARCHAR(50), -- 'aprobar_1', 'aprobar_2', 'fusionar', 'rechazar_ambos'
+    observaciones TEXT,
+    CONSTRAINT unique_duplicado UNIQUE (contrato_id_1, contrato_id_2)
+);
+
+-- Historial de cambios (auditoría)
+CREATE TABLE historial_contratos (
+    id SERIAL PRIMARY KEY,
+    contrato_id INTEGER REFERENCES contratos(id) ON DELETE CASCADE,
+    campo_modificado VARCHAR(100),
+    valor_anterior TEXT,
+    valor_nuevo TEXT,
+    usuario_id INTEGER REFERENCES empleados(id),
+    fecha_modificacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tipo_cambio VARCHAR(50) CHECK (tipo_cambio IN ('sincronizacion', 'manual', 'validacion'))
+);
+
+-- Reglas de asociación automática
+CREATE TABLE reglas_asociacion (
+    id SERIAL PRIMARY KEY,
+    departamento_id INTEGER REFERENCES departamentos(id),
+    tipo_regla VARCHAR(50) CHECK (tipo_regla IN ('departamento', 'organismo', 'palabra_clave', 'cpv', 'importe')),
+    campo_origen VARCHAR(100), -- 'departament_adjudicador', 'cpv_principal_codi', etc.
+    valor_buscar TEXT,
+    operador VARCHAR(20) CHECK (operador IN ('igual', 'contiene', 'comienza_con', 'mayor_que', 'menor_que')),
+    prioridad INTEGER DEFAULT 0,
+    activa BOOLEAN DEFAULT true,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## 6. Lógica de Sincronización Detallada
+
+### 6.1 Algoritmo de Sincronización
+```
+1. Iniciar registro de sincronización
+   - INSERT en tabla sincronizaciones (estado: 'en_proceso')
+
+2. Consultar API
+   - GET https://analisi.transparenciacatalunya.cat/resource/ybgg-dgi6.json?codi_ine10=4305160009
+   - (Agregar parámetros de paginación si dataset es muy grande)
+
+3. Para cada registro de la API:
+   a. Calcular hash_contenido = MD5(JSON completo del registro)
+   
+   b. Buscar en BD por codi_expedient
+   
+   c. Si NO existe:
+      - INSERT nuevo contrato
+      - Aplicar reglas de asociación automática
+      - Incrementar contador registros_nuevos
+   
+   d. Si existe:
+      - Comparar hash_contenido
+      - Si hash difiere:
+        * UPDATE todos los campos
+        * Guardar cambios en historial_contratos
+        * Actualizar fecha_ultima_sincronizacion
+        * Incrementar contador registros_actualizados
+      - Si hash igual:
+        * Incrementar contador registros_sin_cambios
+   
+   e. Detectar duplicados:
+      - Buscar otros contratos con mismo codi_expedient Y mismo estat_actual
+      - Si encuentra duplicado:
+        * Marcar ambos con estado_interno = 'pendiente_aprobacion'
+        * INSERT en tabla duplicados
+        * Enviar notificación a responsables
+
+4. Finalizar sincronización
+   - UPDATE registro sincronizaciones (estado: 'exitosa', fecha_hora_fin)
+   - Generar resumen de cambios
+```
+
+### 6.2 Campos Críticos para Detección de Duplicados
+
+**Criterio Principal**: `codi_expedient` + `estat_actual`
+
+**Campos a Comparar en Panel de Validación**:
+- Importes: `preu_licitar` vs `preu_adjudicar` vs `import_adjudicacio_amb_iva`
+- Adjudicatario: `adjudicatari_nom`, `adjudicatari_nif`
+- Fechas: todas las `data_*` para ver evolución temporal
+- Organismo: `organisme_adjudicador`, `departament_adjudicador`
+
+## 7. Flujos Actualizados
+
+### 7.1 Flujo de Sincronización
+
+1. Sistema ejecuta sincronización (manual desde UI o programada)
+2. Consulta endpoint con filtro `codi_ine10` si aplica
+3. Para cada registro recibido:
+   - Calcula MD5 del JSON completo
+   - Compara con hash almacenado
+   - Si difiere o no existe: actualiza/inserta
+4. Detecta duplicados por `codi_expedient` + `estat_actual`
+5. Aplica reglas de asociación automática a contratos nuevos
+6. Genera log detallado con estadísticas
+7. Notifica a responsables si hay duplicados pendientes
+
+### 7.2 Flujo de Validación de Duplicados
+
+1. Responsable accede a panel "Contratos Pendientes de Aprobación"
+2. Sistema muestra pares de contratos duplicados con comparativa:
+```
+   Contrato A                    | Contrato B
+   -----------------------------|------------------------------
+   Expediente: EXP123           | Expediente: EXP123
+   Estado: Adjudicado           | Estado: Adjudicado
+   Precio Adjudicación: 50.000€ | Precio Adjudicación: 52.000€
+   Fecha Adjudicación: 01/2025  | Fecha Adjudicación: 01/2025
+   Adjudicatario: Empresa A     | Adjudicatario: Empresa A
+```
+3. Responsable analiza diferencias (probablemente uno es actualización del otro)
+4. Decide acción:
+   - **Aprobar más reciente**: marca el contrato con `data_actualitzacio` más reciente como válido
+   - **Rechazar desactualizado**: marca el otro como rechazado
+   - **Fusionar**: consolida información (toma campos más actualizados)
+5. Sistema registra decisión en tabla `duplicados` y actualiza `estado_interno`
+
+### 7.3 Flujo de Asociación Automática
+
+1. Nuevo contrato insertado tras sincronización
+2. Sistema evalúa reglas activas ordenadas por prioridad
+3. Para cada regla:
+```
+   Si regla.tipo = 'departamento':
+     Si contrato.departament_adjudicador CONTIENE regla.valor_buscar:
+       SET contrato.departamento_id = regla.departamento_id
+   
+   Si regla.tipo = 'cpv':
+     Si contrato.cpv_principal_codi = regla.valor_buscar:
+       SET contrato.departamento_id = regla.departamento_id
+   
+   Si regla.tipo = 'palabra_clave':
+     Si contrato.objecte_contracte CONTIENE regla.valor_buscar:
+       SET contrato.departamento_id = regla.departamento_id
+```
+4. Si ninguna regla aplica, queda sin asignar para revisión manual
+
+## 8. Interfaz de Usuario - Pantallas Principales
+
+### 8.1 Dashboard Principal
+- Resumen de contratos por estado
+- Contratos pendientes de aprobación (badge con número)
+- Última sincronización exitosa
+- Gráficos: importes por tipo de contrato, evolución temporal
+
+### 8.2 Listado de Contratos
+**Columnas visibles**:
+- Nº Expediente (`codi_expedient`)
+- Objeto (`objecte_contracte` - truncado)
+- Adjudicatario (`adjudicatari_nom`)
+- Importe Adjudicación (`import_adjudicacio_amb_iva`)
+- Fecha Inicio (`data_inici`)
+- Estado (`estat_actual`)
+- Estado Interno (badge si pendiente)
+
+**Filtros laterales**:
+- Estado actual (dropdown con valores únicos de `estat_actual`)
+- Tipo de contrato (`tipus_contracte`)
+- Rango de fechas (desde/hasta)
+- Rango de importes (min/max)
+- Búsqueda libre (aplica a expediente, objeto, adjudicatario)
+
+### 8.3 Detalle de Contrato
+**Secciones organizadas**:
+
+1. **Información General**
+   - Código expediente, Estado actual, Tipo de contrato
+   - Procedimiento, Tipo de tramitación
+   - Objeto del contrato (completo)
+
+2. **Adjudicación**
+   - Adjudicatario (nombre, NIF, nacionalidad)
+   - Precio licitado vs Precio adjudicado
+   - Importe con/sin IVA
+   - Organismo y Departamento adjudicador
+
+3. **Fechas Clave**
+   - Timeline visual con todas las fechas:
+     * Anuncio previo, Licitación, Adjudicación, Formalización
+     * Inicio, Final
+     * Publicación, Actualización
+
+4. **Clasificación**
+   - CPV Principal (código y descripción)
+   - NUTS (código y descripción)
+   - Forma de financiamiento
+
+5. **Enlaces**
+   - Perfil del contratante
+   - Plataforma de contratación
+   - Anuncios (previo, licitación, adjudicación, formalización)
+
+6. **Gestión Interna**
+   - Departamento asignado (editable por responsable)
+   - Estado interno
+   - Historial de cambios
+
+### 8.4 Panel de Validación de Duplicados
+
+**Vista comparativa en dos columnas**:
+```
+┌─────────────────────────────────────────────────────┐
+│ Duplicados Detectados (3 pendientes)                │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│ Expediente: 2024/CONT/12345                         │
+│ Ambos en estado: "Adjudicado"                       │
+│                                                      │
+│ ┌─────────────────────┬─────────────────────────┐  │
+│ │ Contrato A          │ Contrato B              │  │
+│ ├─────────────────────┼─────────────────────────┤  │
+│ │ Actualizado:        │ Actualizado:            │  │
+│ │ 15/01/2025 10:30   │ 10/01/2025 14:20       │  │
+│ │                     │                         │  │
+│ │ Importe adj:        │ Importe adj:            │  │
+│ │ 52.000 €           │ 50.000 €  ⚠️           │  │
+│ │                     │                         │  │
+│ │ Adjudicatario:      │ Adjudicatario:          │  │
+│ │ Empresa XYZ SL     │ Empresa XYZ SL         │  │
+│ │                     │                         │  │
+│ │ Fecha adjudicación: │ Fecha adjudicación:     │  │
+│ │ 05/01/2025         │ 05/01/2025             │  │
+│ └─────────────────────┴─────────────────────────┘  │
+│                                                      │
+│ [ Aprobar A ] [ Aprobar B ] [ Fusionar ] [ Rechazar ambos ] │
+│                                                      │
+│ Observaciones: _________________________________    │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+```
+
+### 8.5 Panel de Sincronización
+
+**Información mostrada**:
+- Estado actual de sincronización (en proceso / idle)
+- Última sincronización exitosa (fecha/hora)
+- Historial de sincronizaciones:
+```
+  Fecha              | Estado   | Nuevos | Actualizados | Sin cambios
+  -------------------|----------|--------|--------------|-------------
+  21/01/2025 14:30  | Exitosa  | 15     | 42           | 1.203
+  21/01/2025 08:00  | Exitosa  | 8      | 31           | 1.217
+  20/01/2025 20:00  | Fallida  | -      | -            | -
+
+Botón "Sincronizar Ahora"
+Configuración:
+
+Frecuencia automática (ninguna, cada hora, cada 6h, diaria)
+Notificar por email si hay duplicados
+Filtro codi_ine10 (para múltiples entidades)
+
+
+
+9. Reglas de Negocio Adicionales
+9.1 Detección Inteligente de Duplicados
+Además del criterio básico (codi_expedient + estat_actual), considerar:
+Casos especiales:
+
+Si dos contratos tienen mismo expediente y estado, pero data_actualitzacio difiere por menos de 24h → probablemente es actualización, priorizar más reciente
+Si importes difieren en más del 10% → marcar como crítico para revisión
+Si adjudicatarios son diferentes → marcar como crítico (posible error)
+
+9.2 Estados del Contrato en el Ciclo de Vida
+Según los datos de la API, los estados típicos son:
+
+Anuncio previo
+Licitación
+Adjudicación
+Formalización
+(otros según estat_actual)
+
+Lógica: Un mismo expediente puede tener múltiples registros en diferentes estados (evolución del contrato). Solo se considera duplicado si estado Y expediente coinciden.
+9.3 Privacidad y Permisos
+Empleados regulares:
+
+Ver solo contratos de su departamento
+No pueden reasignar contratos
+No pueden validar duplicados
+
+Responsables de departamento:
+
+Ver contratos de su departamento
+Validar duplicados de su departamento
+Reasignar contratos dentro de su departamento
+Solicitar reasignación a otros departamentos
+
+Administradores:
+
+Acceso total
+Gestionar departamentos y empleados
+Configurar sincronizaciones
+Gestionar reglas de asociación
+Ver logs y auditoría completa
+
+10. Consideraciones Técnicas Adicionales
+10.1 Rendimiento
+Optimizaciones necesarias:
+
+Índices en campos de búsqueda frecuente
+Paginación: 50 registros por página por defecto
+Búsqueda con debounce (300ms)
+Cache de filtros aplicados
+Para datasets grandes (>10K), considerar sincronización incremental usando data_actualitzacio como filtro
+
+10.2 Manejo de Errores
+Errores posibles:
+
+API no disponible → reintentar 3 veces con backoff exponencial
+Timeout → abortar sincronización, marcar como fallida
+Datos corruptos/malformados → log error, continuar con siguiente registro
+Violación de constraint → log error, notificar admin
+
+10.3 Logs y Auditoría
+Eventos a registrar:
+
+Todas las sincronizaciones (exitosas y fallidas)
+Validaciones de duplicados (quién, cuándo, qué acción)
+Reasignaciones de contratos entre departamentos
+Cambios en reglas de asociación
+Accesos a contratos (opcional, para compliance)
+
+11. Stack Tecnológico Sugerido
+Backend:
+
+Node.js + Express o Django/FastAPI (Python)
+PostgreSQL (por soporte robusto de JSONB)
+Redis (para cache y cola de sincronización)
+
+Frontend:
+
+React + TypeScript
+TailwindCSS o Material-UI
+React Query (para gestión de estado servidor)
+Recharts (para gráficos)
+
+Infraestructura:
+
+Docker + Docker Compose
+Nginx (reverse proxy)
+Cron o node-schedule (sincronizaciones programadas)
+
+12. Métricas de Éxito Actualizadas
+
+Tiempo de sincronización < 5 min para 5.000 registros
+100% de duplicados detectados automáticamente
+< 2 minutos para validar un duplicado
+95% de contratos asociados automáticamente a departamento correcto
+< 1 segundo para cargar listado con filtros (50 registros)
+0 pérdida de datos durante sincronizaciones
+
+13. Roadmap Actualizado
+Fase 1 - MVP (4-6 semanas)
+
+✅ Modelo de datos completo en PostgreSQL
+✅ CRUD de departamentos y empleados
+✅ Sincronización básica con detección de cambios por hash
+✅ Detección de duplicados (expediente + estado)
+✅ Visualización básica de contratos con filtros esenciales
+✅ Panel de validación de duplicados
+
+Fase 2 - Mejoras (3-4 semanas)
+
+✅ Reglas de asociación automática
+✅ Historial de cambios y auditoría
+✅ Dashboard con gráficos
+✅ Filtros avanzados y búsqueda optimizada
+✅ Notificaciones por email
+✅ Sincronización programada
+
+Fase 3 - Avanzado (4-6 semanas)
+
+✅ Exportación de datos (Excel, CSV, PDF)
+✅ Reportes personalizados
+✅ API REST para integraciones externas
+✅ Gestión de múltiples entidades (codi_ine10)
+✅ App móvil (opcional)
+✅ Machine Learning para mejorar asociaciones automáticas
+
+
+Anexo: Ejemplos de Queries SQL Útiles
+sql-- Contratos con duplicados pendientes de validación
+SELECT c.codi_expedient, c.estat_actual, COUNT(*) as total_duplicados
+FROM contratos c
+WHERE c.estado_interno = 'pendiente_aprobacion'
+GROUP BY c.codi_expedient, c.estat_actual
+HAVING COUNT(*) > 1;
+
+-- Contratos sin asignar a departamento
+SELECT codi_expedient, objecte_contracte, preu_adjudicar
+FROM contratos
+WHERE departamento_id IS NULL
+AND estado_interno = 'normal'
+ORDER BY preu_adjudicar DESC;
+
+-- Resumen de última sincronización
+SELECT 
+    fecha_hora_inicio,
+    registros_nuevos,
+    registros_actualizados,
+    registros_sin_cambios,
+    (registros_nuevos + registros_actualizados + registros_sin_cambios) as total_procesados
+FROM sincronizaciones
+ORDER BY fecha_hora_inicio DESC
+LIMIT 1;
+
+-- Top 10 adjudicatarios por volumen
+SELECT 
+    adjudicatari_nom,
+    COUNT(*) as total_contratos,
+    SUM(import_adjudicacio_amb_iva) as volumen_total
+FROM contratos
+WHERE adjudicatari_nom IS NOT NULL
+GROUP BY adjudicatari_nom
+ORDER BY volumen_total DESC
+LIMIT 10;

@@ -185,7 +185,7 @@ body {
 
 /* Loading Animation */
 .loading-spinner {
-  @apply animate-spin rounded-full border-4 border-slate-200 border-t-primary-600;
+  @apply animate-spin rounded-full border-[6px] border-slate-100 border-t-primary-600 w-16 h-16;
 }
 
 /* Pulse animation for live indicators */

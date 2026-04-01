@@ -13,7 +13,10 @@ import {
     ChevronLeft,
     ChevronRight,
     Filter,
-    Eye
+    Euro,
+    Clock,
+    Hash,
+    Maximize2
 } from 'lucide-react';
 import FavoriteButton from '../components/FavoriteButton';
 
@@ -22,13 +25,18 @@ export default function SuperBuscador() {
     const [q, setQ] = useState('');
     const [organisme, setOrganisme] = useState('');
     const [objecte, setObjecte] = useState('');
+    const [minImporte, setMinImporte] = useState<string>('');
+    const [maxImporte, setMaxImporte] = useState<string>('');
+    const [fechaDesde, setFechaDesde] = useState('');
+    const [fechaHasta, setFechaHasta] = useState('');
+    
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [offset, setOffset] = useState(0);
     const [showFilters, setShowFilters] = useState(false);
     
-    const limit = 20;
+    const limit = 24; // 3 columns * 8 rows
 
     const handleSearch = async (e?: React.FormEvent, newOffset = 0) => {
         if (e) e.preventDefault();
@@ -41,6 +49,10 @@ export default function SuperBuscador() {
                 q,
                 organisme,
                 objecte,
+                min_importe: minImporte ? Number(minImporte) : undefined,
+                max_importe: maxImporte ? Number(maxImporte) : undefined,
+                fecha_desde: fechaDesde || undefined,
+                fecha_hasta: fechaHasta || undefined,
                 limit,
                 offset: newOffset
             });
@@ -57,7 +69,11 @@ export default function SuperBuscador() {
 
     const formatCurrency = (amount: any) => {
         if (amount === undefined || amount === null) return '---';
-        return new Intl.NumberFormat('ca-ES', { style: 'currency', currency: 'EUR' }).format(Number(amount));
+        return new Intl.NumberFormat('ca-ES', { 
+            style: 'currency', 
+            currency: 'EUR',
+            maximumFractionDigits: 0
+        }).format(Number(amount));
     };
 
     const formatDate = (dateStr: string) => {
@@ -66,190 +82,290 @@ export default function SuperBuscador() {
     };
 
     return (
-        <div className="space-y-6 w-full">
-            <div className="flex items-center justify-between">
+        <div className="space-y-6 w-full animate-in fade-in duration-500">
+            {/* Header section with Stats? No, just Title for now */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Globe className="text-primary-500" />
-                        SuperBuscador de la Generalitat
-                    </h1>
-                    <p className="text-slate-500 mt-1">Cerca en temps real a tots els expedients de Catalunya</p>
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-12 h-12 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-200">
+                            <Globe className="text-white" size={28} />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tight">SuperBuscador</h1>
+                            <div className="flex items-center gap-2">
+                                <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                                <p className="text-slate-500 text-sm font-medium">Connectat al Registre Públic de Contractació de Catalunya</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Search Controls */}
-            <div className="glass-card p-6 space-y-4">
-                <form onSubmit={(e) => handleSearch(e)} className="flex gap-3">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Cerca global (ex: 'ambulància', 'software', 'manteniment')..."
-                            className="input input-bordered w-full pl-10 h-12 text-lg"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                        />
-                    </div>
-                    <button 
-                        type="button"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`btn btn-square h-12 ${showFilters ? 'btn-primary' : 'btn-ghost border-slate-200'}`}
-                    >
-                        <Filter size={20} />
-                    </button>
-                    <button type="submit" className="btn btn-primary px-8 h-12" disabled={loading}>
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : 'Cercar'}
-                    </button>
-                </form>
+            {/* Search Controls Card */}
+            <div className="glass-card overflow-visible p-1">
+                <div className="p-6 space-y-6">
+                    <form onSubmit={(e) => handleSearch(e)} className="flex flex-col md:flex-row gap-4">
+                        <div className="relative flex-1 group">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
+                            <input
+                                type="text"
+                                placeholder="Cerca global de conceptes..."
+                                className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl pl-12 pr-4 h-14 text-lg font-medium focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                type="button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`btn h-14 px-6 rounded-2xl flex items-center gap-2 transition-all ${
+                                    showFilters ? 'bg-primary-50 text-primary-700 border-primary-200 shadow-inner' : 'bg-white border-slate-200 text-slate-600'
+                                }`}
+                            >
+                                <Filter size={20} />
+                                <span className="font-bold">Filtres</span>
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="btn btn-primary h-14 px-10 rounded-2xl shadow-lg shadow-primary-100 flex items-center gap-3"
+                                disabled={loading}
+                            >
+                                {loading ? <Loader2 className="animate-spin" size={22} /> : <Search size={22} />}
+                                <span className="text-lg">Cercar</span>
+                            </button>
+                        </div>
+                    </form>
 
-                {showFilters && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300 pt-2 border-t border-slate-100">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <Building2 size={14} /> Nom de l'Organisme
-                            </label>
-                            <input 
-                                type="text" 
-                                className="input input-bordered w-full"
-                                placeholder="ex: AJUNTAMENT DE BARCELONA"
-                                value={organisme}
-                                onChange={(e) => setOrganisme(e.target.value)}
-                            />
+                    {showFilters && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-6 border-t border-slate-100 animate-in slide-in-from-top-4 duration-300">
+                            {/* Filter: Organisme */}
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Building2 size={14} /> Organisme Public
+                                </label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    placeholder="ex: AJUNTAMENT DE BARCELONA"
+                                    value={organisme}
+                                    onChange={(e) => setOrganisme(e.target.value)}
+                                />
+                            </div>
+                            
+                            {/* Filter: Objecte */}
+                            <div className="space-y-2 md:col-span-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <FileText size={14} /> Paraules Claus Objecte
+                                </label>
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    placeholder="ex: ASCENSORS, NETEJA..."
+                                    value={objecte}
+                                    onChange={(e) => setObjecte(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Filter: Import Range */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Euro size={14} /> Import Mínim (€)
+                                </label>
+                                <input 
+                                    type="number" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    placeholder="0"
+                                    value={minImporte}
+                                    onChange={(e) => setMinImporte(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Euro size={14} /> Import Màxim (€)
+                                </label>
+                                <input 
+                                    type="number" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    placeholder="ex: 100000"
+                                    value={maxImporte}
+                                    onChange={(e) => setMaxImporte(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Filter: Date Range */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Clock size={14} /> Públicat Des de
+                                </label>
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    value={fechaDesde}
+                                    onChange={(e) => setFechaDesde(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Clock size={14} /> Públicat Fins
+                                </label>
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 h-11 text-sm focus:bg-white focus:border-primary-500 transition-all outline-none"
+                                    value={fechaHasta}
+                                    onChange={(e) => setFechaHasta(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                <FileText size={14} /> Paraules a l'objecte
-                            </label>
-                            <input 
-                                type="text" 
-                                className="input input-bordered w-full"
-                                placeholder="ex: ASCENSORS"
-                                value={objecte}
-                                onChange={(e) => setObjecte(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
+            {/* Error Message */}
             {error && (
-                <div className="p-8 glass-card border-red-100 bg-red-50/20 text-center flex flex-col items-center gap-3">
-                    <AlertCircle className="text-red-500" size={40} />
-                    <p className="text-red-700 font-medium">{error}</p>
+                <div className="p-10 glass-card border-red-100 bg-red-50/20 text-center flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300">
+                    <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                        <AlertCircle className="text-red-600" size={32} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-red-900">Cap resultat</h3>
+                        <p className="text-red-700 mt-1 max-w-xs mx-auto">{error}</p>
+                    </div>
+                    <button 
+                        onClick={() => { setQ(''); setOrganisme(''); setObjecte(''); setMinImporte(''); setMaxImporte(''); setFechaDesde(''); setFechaHasta(''); }}
+                        className="btn btn-sm btn-ghost text-red-600 hover:bg-red-100 rounded-lg px-6"
+                    >
+                        Netejar filtres
+                    </button>
                 </div>
             )}
 
+            {/* Results Grid - Using CARDS instead of Table */}
             {results.length > 0 && (
-                <div className="space-y-4">
-                    <div className="glass-card overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-6 py-4 font-semibold">Data</th>
-                                        <th className="px-6 py-4 font-semibold">Organisme / Expedient</th>
-                                        <th className="px-6 py-4 font-semibold">Objecte del Contracte</th>
-                                        <th className="px-6 py-4 font-semibold text-right">Import (IVA inc.)</th>
-                                        <th className="px-6 py-4 font-semibold w-20"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {results.map((c, idx) => (
-                                        <tr 
-                                            key={idx} 
-                                            className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                                            onClick={() => navigate(`/superbuscador/${encodeURIComponent(c.codi_expedient)}`)}
-                                        >
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-2 text-slate-500 text-sm">
-                                                    <Calendar size={14} />
-                                                    {formatDate(c.data_publicacio_contracte)}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-primary-600 truncate max-w-[200px]" title={c.nom_organ}>
-                                                        {c.nom_organ}
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-400 font-mono mt-0.5">{c.codi_expedient}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-slate-700 line-clamp-2 leading-relaxed" title={c.objecte_contracte}>
-                                                    {c.objecte_contracte}
-                                                </p>
-                                                <div className="flex gap-2 mt-1">
-                                                    <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{c.tipus_contracte}</span>
-                                                    <span className="text-[10px] bg-primary-50 text-primary-600 px-1.5 py-0.5 rounded">{c.estat_actual}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="font-bold text-slate-800">
-                                                    {formatCurrency(c.import_adjudicacio_amb_iva || c.pressupost_licitacio_amb_iva)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <FavoriteButton codi_expedient={c.codi_expedient} />
-                                                    <button 
-                                                        className="p-2 text-slate-400 hover:text-primary-600 transition-colors"
-                                                        title="Veure Fitxa Detallada"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate(`/superbuscador/${encodeURIComponent(c.codi_expedient)}`);
-                                                        }}
-                                                    >
-                                                        <Eye size={18} />
-                                                    </button>
-                                                    <a 
-                                                        href={c.enllac_publicacio?.url || c.url_plataforma_contractacio} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
-                                                        className="p-2 text-slate-400 hover:text-primary-600 transition-colors inline-block"
-                                                        title="Obrir a la Plataforma"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <ExternalLink size={18} />
-                                                    </a>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                <div className="space-y-8 pb-20">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {results.map((c, idx) => (
+                            <div 
+                                key={idx} 
+                                className="glass-card group hover:scale-[1.02] hover:-translate-y-1 hover:border-primary-300 hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col h-full cursor-pointer border-slate-100 border-2"
+                                onClick={() => navigate(`/superbuscador/${encodeURIComponent(c.codi_expedient)}`)}
+                            >
+                                {/* Card Header: Flags/Badges */}
+                                <div className="p-4 flex items-start justify-between bg-slate-50/50 group-hover:bg-primary-50/30 transition-colors border-b border-slate-100">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-white border border-slate-200 text-slate-500 text-[10px] uppercase font-black px-2 py-0.5 rounded shadow-sm">
+                                                {c.tipus_contracte || 'CONTRACTE'}
+                                            </span>
+                                            <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded shadow-sm ${
+                                                c.estat_actual === 'Adjudicat' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                                c.estat_actual === 'Formalitzat' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                                                'bg-amber-100 text-amber-700 border border-amber-200'
+                                            }`}>
+                                                {c.estat_actual}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-slate-400 mt-1">
+                                            <Hash size={12} />
+                                            <span className="text-[10px] font-mono tracking-tight font-bold">{c.codi_expedient}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <FavoriteButton codi_expedient={c.codi_expedient} />
+                                    </div>
+                                </div>
+
+                                {/* Card Body: Object and Org */}
+                                <div className="p-5 flex-1 flex flex-col gap-4">
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-1.5 text-primary-600">
+                                            <Building2 size={14} className="shrink-0" />
+                                            <span className="text-xs font-black uppercase tracking-tight truncate" title={c.nom_organ}>
+                                                {c.nom_organ}
+                                            </span>
+                                        </div>
+                                        <h3 className="text-sm font-bold text-slate-800 line-clamp-3 leading-snug group-hover:text-primary-800 transition-colors">
+                                            {c.objecte_contracte}
+                                        </h3>
+                                    </div>
+
+                                    <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Pressupost</span>
+                                            <span className="text-lg font-black text-slate-900 leading-none">
+                                                {formatCurrency(c.import_adjudicacio_amb_iva || c.pressupost_licitacio_amb_iva)}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Publicat</span>
+                                            <div className="flex items-center gap-1 text-slate-600 font-bold text-xs uppercase">
+                                                <Calendar size={12} />
+                                                {formatDate(c.data_publicacio_contracte)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Card Footer: Actions */}
+                                <div className="px-5 py-3 bg-slate-50/30 flex items-center gap-2 justify-end border-t border-slate-50">
+                                    <button 
+                                        className="btn btn-xs btn-ghost text-slate-400 hover:text-primary-600 gap-1.5 hover:bg-white"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/superbuscador/${encodeURIComponent(c.codi_expedient)}`);
+                                        }}
+                                    >
+                                        <Maximize2 size={12} /> Detall
+                                    </button>
+                                    <a 
+                                        href={c.enllac_publicacio?.url || c.url_plataforma_contractacio} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="btn btn-xs btn-ghost text-slate-400 hover:text-primary-600 gap-1.5 hover:bg-white"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <ExternalLink size={12} /> Plataforma
+                                    </a>
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Pagination */}
-                    <div className="flex items-center justify-between px-2">
-                        <span className="text-sm text-slate-500">
-                            Mostrant resultats {offset + 1} - {offset + results.length}
-                        </span>
-                        <div className="flex gap-2">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-2 pt-8 border-t border-slate-200">
+                        <div className="text-sm font-bold text-slate-500 uppercase tracking-widest">
+                            Resultats <span className="text-primary-600 px-1">{offset + 1}</span> - <span className="text-primary-600 px-1">{offset + results.length}</span>
+                        </div>
+                        <div className="flex gap-4">
                             <button 
                                 onClick={() => handleSearch(undefined, Math.max(0, offset - limit))}
                                 disabled={offset === 0 || loading}
-                                className="btn btn-sm btn-ghost gap-1 px-4 border-slate-200"
+                                className="btn rounded-xl bg-white border-slate-200 text-slate-700 px-8 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition-all"
                             >
-                                <ChevronLeft size={16} /> Anterior
+                                <ChevronLeft size={20} className="mr-1" /> Anterior
                             </button>
                             <button 
                                 onClick={() => handleSearch(undefined, offset + limit)}
                                 disabled={results.length < limit || loading}
-                                className="btn btn-sm btn-ghost gap-1 px-4 border-slate-200"
+                                className="btn rounded-xl bg-white border-slate-200 text-slate-700 px-8 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm transition-all"
                             >
-                                Següent <ChevronRight size={16} />
+                                Següent <ChevronRight size={20} className="ml-1" />
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
+            {/* Empty State */}
             {!loading && results.length === 0 && !error && (
-                <div className="py-20 flex flex-col items-center justify-center text-center opacity-40">
-                    <Globe size={64} className="text-slate-300 mb-4" />
-                    <p className="text-slate-500 font-medium">Cerca qualsevol cosa a la plataforma oficial</p>
-                    <p className="text-slate-400 text-sm">Els resultats no es guarden a la base de dades local</p>
+                <div className="py-32 flex flex-col items-center justify-center text-center">
+                    <div className="relative mb-8">
+                        <div className="absolute -inset-4 bg-primary-100 rounded-full blur-2xl opacity-40 animate-pulse"></div>
+                        <Globe size={100} className="text-slate-200 relative" />
+                        <Search className="absolute bottom-0 right-0 text-primary-400" size={32} />
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-800 mb-2">Benvingut al SuperBuscador</h3>
+                    <p className="text-slate-400 max-w-md font-medium">Troba referències de contractació de qualsevol administració de Catalunya per comparar preus i procediments.</p>
                 </div>
             )}
         </div>

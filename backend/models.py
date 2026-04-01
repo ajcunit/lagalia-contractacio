@@ -185,6 +185,7 @@ class Duplicado(Base):
     contrato_id_2 = Column(Integer, ForeignKey("contratos.id", ondelete="CASCADE"))
     campo_duplicado = Column(String(100))
     valor_duplicado = Column(String(500))
+    motivo_duplicado = Column(Text) # Explicació per a l'usuari
     fecha_deteccion = Column(DateTime, server_default=func.now())
     estado_validacion = Column(String(50), default='pendiente')
     usuario_validador_id = Column(Integer, ForeignKey("empleados.id"))
@@ -374,3 +375,28 @@ class ContratoFavorito(Base):
     
     carpeta = relationship("CarpetaFavorita", back_populates="contratos")
     contrato = relationship("Contrato", backref="favorito_en")
+
+
+class DuplicadoAdjudicatario(Base):
+    __tablename__ = "duplicados_adjudicatarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_1 = Column(String(255), nullable=False)
+    nombre_2 = Column(String(255), nullable=False)
+    nif = Column(String(50), index=True)
+    motivo = Column(String(255))
+    estado = Column(String(50), default='pendiente') # pendiente, fusionado, rechazado
+    fecha_deteccion = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('nombre_1', 'nombre_2', name='unique_duplicado_adj'),
+    )
+
+
+class AliasAdjudicatario(Base):
+    __tablename__ = "alias_adjudicatarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_original = Column(String(255), unique=True, nullable=False, index=True)
+    nombre_canonico = Column(String(255), nullable=False)
+    fecha_creacion = Column(DateTime, server_default=func.now())

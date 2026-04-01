@@ -113,16 +113,15 @@ class SyncService:
             return None
     
     @staticmethod
-    def map_api_to_model(data: dict) -> dict:
+    def map_api_to_model(data: dict, aliases: dict = None) -> dict:
         """Map API fields to model fields"""
         from datetime import date
         from dateutil.relativedelta import relativedelta
         
-        # Parse dates first
+        # ... (dates logic remains the same)
         data_formalitzacio = SyncService.parse_date(data.get("data_formalitzacio_contracte"))
         durada = SyncService.parse_duration(data.get("durada_contracte"))
         
-        # Calculate end date
         data_finalitzacio = None
         alerta = False
         possiblement_finalitzat = False
@@ -130,27 +129,27 @@ class SyncService:
         if data_formalitzacio and durada:
             data_finalitzacio = SyncService.calculate_end_date(data_formalitzacio, durada)
             if data_finalitzacio:
-                # Normalize to date to avoid datetime vs date comparison errors
                 if hasattr(data_finalitzacio, 'date'):
                     data_finalitzacio = data_finalitzacio.date()
                 today = date.today()
                 six_months_later = today + relativedelta(months=6)
-                # Check if expires within 6 months
                 if today <= data_finalitzacio <= six_months_later:
                     alerta = True
-                # Check if already expired
                 if data_finalitzacio < today:
                     possiblement_finalitzat = True
         
-        # Normalize data_formalitzacio to date
         if data_formalitzacio and hasattr(data_formalitzacio, 'date'):
             data_formalitzacio = data_formalitzacio.date()
         
-        # Calculate data_inici = day after formalitzacio
         data_inici_calc = None
         if data_formalitzacio:
             from dateutil.relativedelta import relativedelta
             data_inici_calc = data_formalitzacio + relativedelta(days=1)
+
+        # Apply adjudicator alias if exists
+        adj_nom = data.get("denominacio_adjudicatari")
+        if aliases and adj_nom in aliases:
+            adj_nom = aliases[adj_nom]
         
         return {
             "codi_expedient": data.get("codi_expedient", ""),
@@ -159,8 +158,8 @@ class SyncService:
             "objecte_contracte": data.get("objecte_contracte"),
             "tipus_contracte": data.get("tipus_contracte"),
             "procediment": data.get("procediment"),
-            "estat_actual": data.get("resultat") or data.get("fase_publicacio"),  # API: resultat, fallback: fase_publicacio
-            "adjudicatari_nom": data.get("denominacio_adjudicatari"),  # API field: denominacio_adjudicatari
+            "estat_actual": data.get("resultat") or data.get("fase_publicacio"),
+            "adjudicatari_nom": adj_nom,
             "adjudicatari_nif": data.get("identificacio_adjudicatari"),  # API field: identificacio_adjudicatari
             "adjudicatari_nacionalitat": data.get("adjudicatari_nacionalitat"),
             "organisme_adjudicador": data.get("nom_organ"),  # API field: nom_organ
@@ -251,10 +250,11 @@ class SyncService:
     @staticmethod
     def detect_duplicates(db: Session, contrato: models.Contrato) -> None:
         """Detect and register duplicates"""
-        # Find contracts with same expedient and state
+        # Find contracts with same expedient, state and lot
         duplicados = db.query(models.Contrato).filter(
             models.Contrato.codi_expedient == contrato.codi_expedient,
             models.Contrato.estat_actual == contrato.estat_actual,
+            models.Contrato.lots == contrato.lots,
             models.Contrato.id != contrato.id
         ).all()
         
@@ -270,8 +270,9 @@ class SyncService:
                 duplicado = models.Duplicado(
                     contrato_id_1=min(contrato.id, dup.id),
                     contrato_id_2=max(contrato.id, dup.id),
-                    campo_duplicado="codi_expedient+estat_actual",
-                    valor_duplicado=f"{contrato.codi_expedient}|{contrato.estat_actual}"
+                    campo_duplicado="codi_expedient+estat_actual+lots",
+                    valor_duplicado=f"{contrato.codi_expedient}|{contrato.estat_actual}|{contrato.lots}",
+                    motivo_duplicado="Mateix Codi d'Expedient, Estat i Lot"
                 )
                 db.add(duplicado)
                 
@@ -292,6 +293,9 @@ class SyncService:
             
         try:
             yield f'data: {json.dumps({"msg": "Iniciant sincronització...", "progress": 5})}\n\n'
+            
+            # Load aliases
+            aliases = {a.nombre_original: a.nombre_canonico for a in db.query(models.AliasAdjudicatario).all()}
             
             yield f'data: {json.dumps({"msg": "Descarregant contractes del registre públic...", "progress": 10})}\n\n'
             data = SyncService.fetch_data(db, codi_ine10)
@@ -320,7 +324,7 @@ class SyncService:
                         continue
                         
                     record_hash = SyncService.calculate_hash(record)
-                    mapped_data = SyncService.map_api_to_model(record)
+                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases)
                     mapped_data["hash_contenido"] = record_hash
                     
                     existing = db.query(models.Contrato).filter(
@@ -418,11 +422,13 @@ class SyncService:
             return
         
         try:
-            # Fetch data from API
             logger.info("Fetching data from API...")
             data = SyncService.fetch_data(db, codi_ine10)
             logger.info(f"Fetched {len(data)} records")
             sync.total_registros_api = len(data)
+            
+            # Load aliases
+            aliases = {a.nombre_original: a.nombre_canonico for a in db.query(models.AliasAdjudicatario).all()}
             
             nuevos = 0
             actualizados = 0
@@ -439,7 +445,7 @@ class SyncService:
                         continue
                     
                     record_hash = SyncService.calculate_hash(record)
-                    mapped_data = SyncService.map_api_to_model(record)
+                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases)
                     mapped_data["hash_contenido"] = record_hash
                     
                     # Look for existing contract
@@ -684,10 +690,12 @@ class SyncService:
             if not records:
                 return stats
                 
+            # Load aliases
+            aliases = {a.nombre_original: a.nombre_canonico for a in db.query(models.AliasAdjudicatario).all()}
+            
             stats["total_consultats"] = len(records)
             
             # Group by codi_expedient
-            # A minor contract might have a 'menor' record and a 'liquidació' record
             grouped = {}
             for r in records:
                 exp = r.get("codi_expedient")
@@ -719,13 +727,17 @@ class SyncService:
                     }
                     
                     if menor_record:
+                        adj_nom = menor_record.get("adjudicatari")
+                        if aliases and adj_nom in aliases:
+                            adj_nom = aliases[adj_nom]
+                            
                         d_adj = SyncService.parse_date(menor_record.get("data_adjudicacio"))
                         if d_adj and hasattr(d_adj, 'date'): d_adj = d_adj.date()
                         
                         update_data.update({
                             "tipus_contracte": menor_record.get("tipus_contracte"),
                             "descripcio_expedient": menor_record.get("descripcio_expedient"),
-                            "adjudicatari": menor_record.get("adjudicatari"),
+                            "adjudicatari": adj_nom,
                             "import_adjudicacio": SyncService.parse_float(menor_record.get("import_adjudicacio")),
                             "data_adjudicacio": d_adj,
                             "exercici": SyncService.parse_int(menor_record.get("exercici")),

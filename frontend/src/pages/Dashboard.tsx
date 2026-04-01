@@ -293,15 +293,18 @@ export default function Dashboard() {
                     <h3 className="text-lg font-semibold text-slate-800 mb-4">Top Adjudicataris</h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={adjudicatariosData} layout="vertical" margin={{ left: 20 }}>
+                            <BarChart data={adjudicatariosData} layout="vertical" margin={{ left: 30, right: 30, top: 0, bottom: 0 }}>
+
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                                 <XAxis type="number" tickFormatter={(v) => formatCurrency(v)} />
                                 <YAxis
                                     type="category"
                                     dataKey="nombre"
-                                    width={120}
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(v) => (v.length > 18 ? v.substring(0, 18) + '...' : v)}
+                                    width={180}
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickFormatter={(v) => (v && v.length > 30 ? v.substring(0, 27) + '...' : v)}
+                                    axisLine={false}
+                                    tickLine={false}
                                 />
                                 <Tooltip
                                     formatter={(value: number) => formatCurrency(value)}

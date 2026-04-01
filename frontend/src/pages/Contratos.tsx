@@ -1,19 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { api, ContratoListItem, FiltroOpciones, Departamento, Empleado } from '../api/client';
-import { Search, Filter, ChevronLeft, ChevronRight, ExternalLink, Clock, AlertCircle, Calendar, Layers, CheckSquare } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { api, ContratoListItem, Departamento, Empleado } from '../api/client';
+import { Search, Filter, ChevronLeft, ChevronRight, ExternalLink, Clock, AlertCircle, FileText } from 'lucide-react';
 import { useSortableData, SortableTh } from '../components/SortableTable';
 
-export default function Contratos() {
+interface ContratosProps {
+    hideHeader?: boolean;
+}
+
+export default function Contratos({ hideHeader = false }: ContratosProps) {
+    const navigate = useNavigate();
     const [contratosRaw, setContratosRaw] = useState<ContratoListItem[]>([]);
-    const [filtros, setFiltros] = useState<FiltroOpciones | null>(null);
     const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
     const [user, setUser] = useState<Empleado | null>(null);
     const [selectedContracts, setSelectedContracts] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(0);
+    const [limit, setLimit] = useState(() => {
+        const saved = localStorage.getItem('contratos_limit');
+        return saved ? parseInt(saved) : 50;
+    });
     const { sortedItems: contratos, sortConfig, requestSort } = useSortableData(contratosRaw);
-    const [showFilters, setShowFilters] = useState(false);
 
     const [urlParams] = useSearchParams();
 
@@ -28,25 +35,18 @@ export default function Contratos() {
         alerta_finalitzacio: urlParams.get('alerta_finalitzacio') || '',
         possiblement_finalitzat: urlParams.get('possiblement_finalitzat') || '',
         departamento_id: urlParams.get('departamento_id') || '',
+        sense_departament: urlParams.get('sense_departament') === 'true',
     });
 
-    // Generate year options (current year to 10 years back)
-    const currentYear = new Date().getFullYear();
-    const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);
-
-    const LIMIT = 50;
-
     useEffect(() => {
-        loadFiltros();
         loadDepartamentos();
         api.getMe().then(setUser).catch(console.error);
     }, []);
 
     useEffect(() => {
         loadContratos();
-        // Reset selections when search/page changes to avoid accidental mass assigns across filters
         setSelectedContracts(new Set());
-    }, [page, searchParams]);
+    }, [page, limit, searchParams]);
     
     const loadDepartamentos = async () => {
         try {
@@ -57,23 +57,12 @@ export default function Contratos() {
         }
     };
 
-    const loadFiltros = async () => {
-        try {
-            const data = await api.getFiltroOpciones();
-            setFiltros(data);
-        } catch (err) {
-            console.error('Error loading filtros:', err);
-        }
-    };
-
     const loadContratos = async () => {
         try {
             setLoading(true);
-
-            // Build params, converting year to date range
             const params: Record<string, string | number | boolean> = {
-                skip: page * LIMIT,
-                limit: LIMIT,
+                skip: page * limit,
+                limit: limit,
                 busqueda: searchParams.busqueda,
                 estat_actual: searchParams.estat_actual,
                 tipus_contracte: searchParams.tipus_contracte,
@@ -81,21 +70,12 @@ export default function Contratos() {
                 adjudicatari_nom: searchParams.adjudicatari_nom,
             };
 
-            if (searchParams.departamento_id) {
-                params.departamento_id = parseInt(searchParams.departamento_id);
-            }
+            if (searchParams.departamento_id) params.departamento_id = parseInt(searchParams.departamento_id);
+            if (searchParams.te_prorroga !== '') params.te_prorroga = searchParams.te_prorroga === 'true';
+            if (searchParams.alerta_finalitzacio !== '') params.alerta_finalitzacio = searchParams.alerta_finalitzacio === 'true';
+            if (searchParams.possiblement_finalitzat !== '') params.possiblement_finalitzat = searchParams.possiblement_finalitzat === 'true';
+            if (searchParams.sense_departament) params.sense_departament = true;
 
-            if (searchParams.te_prorroga !== '') {
-                params.te_prorroga = searchParams.te_prorroga === 'true';
-            }
-            if (searchParams.alerta_finalitzacio !== '') {
-                params.alerta_finalitzacio = searchParams.alerta_finalitzacio === 'true';
-            }
-            if (searchParams.possiblement_finalitzat !== '') {
-                params.possiblement_finalitzat = searchParams.possiblement_finalitzat === 'true';
-            }
-
-            // Convert year to date range
             if (searchParams.any_adjudicacio) {
                 const year = parseInt(searchParams.any_adjudicacio);
                 params.fecha_inicio_desde = `${year}-01-01`;
@@ -111,12 +91,6 @@ export default function Contratos() {
         }
     };
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        setPage(0);
-        loadContratos();
-    };
-
     const formatCurrency = (value?: number) => {
         if (value === undefined || value === null) return '-';
         return new Intl.NumberFormat('ca-ES', {
@@ -126,78 +100,40 @@ export default function Contratos() {
         }).format(value);
     };
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return '-';
-        return new Date(dateStr).toLocaleDateString('ca-ES');
-    };
-
     const getEstadoInternoBadge = (estado: string) => {
         switch (estado) {
-            case 'pendiente_aprobacion':
-                return <span className="badge badge-pending">Pendent</span>;
-            case 'aprobado':
-                return <span className="badge badge-success">Aprovat</span>;
-            case 'rechazado':
-                return <span className="badge badge-error">Rebutjat</span>;
-            default:
-                return null;
+            case 'pendiente_aprobacion': return <span className="badge badge-pending">Pendent</span>;
+            case 'aprobado': return <span className="badge badge-success">Aprovat</span>;
+            case 'rechazado': return <span className="badge badge-error">Rebutjat</span>;
+            default: return null;
         }
     };
 
     const getExpirationBadge = (contrato: ContratoListItem) => {
         if (contrato.possiblement_finalitzat) {
-            return (
-                <span className="badge bg-red-100 text-red-800 flex items-center gap-1" title="Possiblement finalitzat">
-                    <AlertCircle size={12} />
-                    Finalitzat?
-                </span>
-            );
+            return <span className="badge bg-red-100 text-red-800 flex items-center gap-1"><AlertCircle size={12} />Finalitzat?</span>;
         }
         if (contrato.alerta_finalitzacio) {
-            return (
-                <span className="badge bg-yellow-100 text-yellow-800 flex items-center gap-1" title="Finalitza en 6 mesos">
-                    <Clock size={12} />
-                    Pròxim
-                </span>
-            );
-        }
-        return null;
-    };
-
-    const getProrroguesBadge = (contrato: ContratoListItem) => {
-        if (contrato.num_prorrogues && contrato.num_prorrogues > 0) {
-            return (
-                <span className="badge bg-blue-100 text-blue-800 flex items-center gap-1" title={`${contrato.num_prorrogues} pròrrogues`}>
-                    <Calendar size={12} />
-                    {contrato.num_prorrogues}
-                </span>
-            );
+            return <span className="badge bg-yellow-100 text-yellow-800 flex items-center gap-1"><Clock size={12} />Pròxim</span>;
         }
         return null;
     };
 
     const toggleContractSelect = (id: number) => {
         const newSet = new Set(selectedContracts);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-        }
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
         setSelectedContracts(newSet);
     };
 
     const toggleAllContracts = () => {
-        if (selectedContracts.size === contratos.length && contratos.length > 0) {
-            setSelectedContracts(new Set());
-        } else {
-            setSelectedContracts(new Set(contratos.map(c => c.id)));
-        }
+        if (selectedContracts.size === contratos.length && contratos.length > 0) setSelectedContracts(new Set());
+        else setSelectedContracts(new Set(contratos.map(c => c.id)));
     };
 
     const handleMassAssign = async (deptId: string) => {
         const targetDept = deptId ? parseInt(deptId) : null;
         if (selectedContracts.size === 0) return;
-        
         try {
             await api.asignarMasivoDepartamentos(Array.from(selectedContracts), targetDept);
             await loadContratos();
@@ -209,280 +145,258 @@ export default function Contratos() {
     };
 
     const canAssign = user?.rol === 'admin' || user?.rol === 'responsable_contratacion';
+    const [showAdvanced, setShowAdvanced] = useState(false);
+
+    const handleResetFilters = () => {
+        setSearchParams({
+            busqueda: '', estat_actual: '', tipus_contracte: '', estado_interno: '',
+            adjudicatari_nom: '', any_adjudicacio: '', te_prorroga: '',
+            alerta_finalitzacio: '', possiblement_finalitzat: '', departamento_id: '',
+            sense_departament: false,
+        });
+        setPage(0);
+    };
+
+    const handleExportCSV = () => {
+        const params = new URLSearchParams();
+        params.append('busqueda', searchParams.busqueda);
+        if (searchParams.estat_actual) params.append('estat_actual', searchParams.estat_actual);
+        if (searchParams.tipus_contracte) params.append('tipus_contracte', searchParams.tipus_contracte);
+        if (searchParams.estado_interno) params.append('estado_interno', searchParams.estado_interno);
+        if (searchParams.adjudicatari_nom) params.append('adjudicatari_nom', searchParams.adjudicatari_nom);
+        if (searchParams.departamento_id) params.append('departamento_id', searchParams.departamento_id);
+        if (searchParams.te_prorroga !== '') params.append('te_prorroga', searchParams.te_prorroga);
+        if (searchParams.alerta_finalitzacio !== '') params.append('alerta_finalitzacio', searchParams.alerta_finalitzacio);
+        if (searchParams.possiblement_finalitzat !== '') params.append('possiblement_finalitzat', searchParams.possiblement_finalitzat);
+        if (searchParams.sense_departament) params.append('sense_departament', 'true');
+        if (searchParams.any_adjudicacio) {
+            const year = parseInt(searchParams.any_adjudicacio);
+            params.append('fecha_inicio_desde', `${year}-01-01`);
+            params.append('fecha_inicio_hasta', `${year}-12-31`);
+        }
+        const token = localStorage.getItem('token');
+        if (token) params.append('token', token);
+        window.open(`/api/contratos/export/csv?${params.toString()}`, '_blank');
+    };
 
     return (
-        <div className="space-y-6 w-full h-full flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Contractes</h1>
-                    <p className="text-slate-500">Gestió i consulta de contractes públics</p>
-                </div>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="glass-card p-4">
-                <form onSubmit={handleSearch} className="space-y-4">
-                    <div className="flex gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                            <input
-                                type="text"
-                                placeholder="Cercar per expedient, objecte o adjudicatari..."
-                                className="input input-search"
-                                value={searchParams.busqueda}
-                                onChange={(e) => setSearchParams({ ...searchParams, busqueda: e.target.value })}
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'} gap-2`}
-                            onClick={() => setShowFilters(!showFilters)}
-                        >
-                            <Filter size={18} />
-                            Filtres
-                        </button>
-                    </div>
-
-                    {showFilters && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-slate-100">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Estat Actual</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.estat_actual}
-                                    onChange={(e) => setSearchParams({ ...searchParams, estat_actual: e.target.value })}
-                                >
-                                    <option value="">Tots els estats</option>
-                                    {filtros?.estados.map((estado) => (
-                                        <option key={estado} value={estado}>
-                                            {estado}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Any Adjudicació</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.any_adjudicacio}
-                                    onChange={(e) => setSearchParams({ ...searchParams, any_adjudicacio: e.target.value })}
-                                >
-                                    <option value="">Tots els anys</option>
-                                    {yearOptions.map((year) => (
-                                        <option key={year} value={year}>
-                                            {year}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Adjudicatari</label>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    placeholder="Cercar adjudicatari..."
-                                    value={searchParams.adjudicatari_nom}
-                                    onChange={(e) => setSearchParams({ ...searchParams, adjudicatari_nom: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Tipus de Contracte</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.tipus_contracte}
-                                    onChange={(e) => setSearchParams({ ...searchParams, tipus_contracte: e.target.value })}
-                                >
-                                    <option value="">Tots els tipus</option>
-                                    {filtros?.tipos_contrato.map((tipo) => (
-                                        <option key={tipo} value={tipo}>
-                                            {tipo}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Estat Intern</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.estado_interno}
-                                    onChange={(e) => setSearchParams({ ...searchParams, estado_interno: e.target.value })}
-                                >
-                                    <option value="">Tots</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="pendiente_aprobacion">Pendent d'aprovació</option>
-                                    <option value="aprobado">Aprovat</option>
-                                    <option value="rechazado">Rebutjat</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Té Pròrroga</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.te_prorroga}
-                                    onChange={(e) => setSearchParams({ ...searchParams, te_prorroga: e.target.value })}
-                                >
-                                    <option value="">Tots</option>
-                                    <option value="true">Sí</option>
-                                    <option value="false">No</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Departament</label>
-                                <select
-                                    className="input"
-                                    value={searchParams.departamento_id}
-                                    onChange={(e) => setSearchParams({ ...searchParams, departamento_id: e.target.value })}
-                                >
-                                    <option value="">Tots els departaments</option>
-                                    {departamentos.map(d => (
-                                        <option key={d.id} value={d.id}>{d.nombre}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    )}
-                </form>
-            </div>
-
-            {canAssign && (
-                <div className={`glass-card p-4 flex items-center gap-6 border-l-4 border-l-primary-500 transition-all duration-300 overflow-visible ${selectedContracts.size === 0 ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
-                    <div className="flex items-center gap-3 shrink-0">
-                        <CheckSquare className="text-primary-600" size={24} />
-                        <div>
-                            <span className="font-semibold text-slate-800">{selectedContracts.size}</span>
-                            <span className="text-slate-600 ml-1">contractes seleccionats</span>
-                        </div>
-                    </div>
-                    <div className="flex-1 flex items-center gap-3">
-                        <select 
-                            className="input w-72 max-w-full bg-white shadow-sm"
-                            id="mass-assign-select"
-                            disabled={selectedContracts.size === 0}
-                            defaultValue=""
-                        >
-                            <option value="" disabled>-- Selecciona un departament --</option>
-                            <option value="none">-- Treure Departament --</option>
-                            {departamentos.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                    {d.nombre}
-                                </option>
-                            ))}
-                        </select>
-                        <button 
-                            className="btn btn-primary whitespace-nowrap shadow-sm gap-2"
-                            disabled={selectedContracts.size === 0}
-                            onClick={() => {
-                                const select = document.getElementById('mass-assign-select') as HTMLSelectElement;
-                                if (select.value) {
-                                  handleMassAssign(select.value === 'none' ? '' : select.value);
-                                  select.value = '';
-                                }
-                            }}
-                        >
-                            <CheckSquare size={18} />
-                            Assignar Selecció
-                        </button>
+        <div className="space-y-4 w-full h-full flex flex-col overflow-hidden relative">
+            {!hideHeader && (
+                <div className="flex items-center justify-between shrink-0">
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-800">Contractes</h1>
+                        <p className="text-xs text-slate-500">Gestió i consulta de contractació</p>
                     </div>
                 </div>
             )}
 
-            {/* Table */}
-            <div className="glass-card flex-1 flex flex-col overflow-hidden">
+            {/* High-End Professional Toolbar */}
+            <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm shrink-0 mb-2">
+                {/* Segmented Control (Toggle) */}
+                <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+                    <button className="px-4 py-1.5 text-xs font-bold rounded-lg transition-all bg-white text-slate-800 shadow-sm" onClick={() => navigate('/contratacion')}>Majors</button>
+                    <button className="px-4 py-1.5 text-xs font-bold rounded-lg transition-all text-slate-500 hover:text-slate-700" onClick={() => navigate('/contratos-menores')}>Menors</button>
+                </div>
+
+                {/* Search Section */}
+                <div className="flex-1 flex items-center gap-3 px-4 h-11 bg-slate-50/50 rounded-xl border border-slate-100 focus-within:bg-white focus-within:border-primary-200 focus-within:ring-4 focus-within:ring-primary-500/5 transition-all duration-200">
+                    <Search className="text-slate-400 shrink-0" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="Cerca per expedient, projecte o paraula clau..." 
+                        className="bg-transparent border-none focus:ring-0 w-full text-sm text-slate-700 placeholder:text-slate-400 font-medium"
+                        value={searchParams.busqueda}
+                        onChange={(e) => setSearchParams({ ...searchParams, busqueda: e.target.value })}
+                    />
+                </div>
+
+                <div className="flex items-center gap-2 px-1">
+                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[140px]" value={searchParams.departamento_id} onChange={(e) => setSearchParams({ ...searchParams, departamento_id: e.target.value })}>
+                        <option value="">Departaments</option>
+                        {departamentos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                    </select>
+
+                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[100px]" value={searchParams.any_adjudicacio} onChange={(e) => setSearchParams({ ...searchParams, any_adjudicacio: e.target.value })}>
+                        <option value="">Exercicis</option>
+                        {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - i).map(year => <option key={year} value={year}>{year}</option>)}
+                    </select>
+
+                    <button onClick={() => setShowAdvanced(!showAdvanced)} className={`h-11 px-5 rounded-xl border-2 flex items-center gap-2 font-bold text-sm transition-all duration-200 ${showAdvanced ? 'bg-primary-50 border-primary-200 text-primary-700 shadow-inner' : 'bg-white border-transparent text-slate-600 hover:bg-slate-50 active:scale-95'}`}>
+                        <Filter size={18} />
+                        Filtres
+                    </button>
+
+                    <div className="h-8 w-px bg-slate-200 mx-1"></div>
+
+                    <button onClick={handleExportCSV} className="h-11 w-11 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-slate-50 hover:text-primary-600 border border-slate-100 hover:border-primary-100 shadow-sm transition-all active:scale-95" title="Exportar CSV">
+                        <ExternalLink size={20} />
+                    </button>
+                </div>
+            </div>
+
+            {showAdvanced && (
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-top-2 duration-200 z-20 shrink-0 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Configuració</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <select 
+                                    className="h-10 px-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full cursor-pointer" 
+                                    value={searchParams.tipus_contracte} 
+                                    onChange={(e) => setSearchParams({ ...searchParams, tipus_contracte: e.target.value })}
+                                >
+                                    <option value="">Tipus</option>
+                                    <option value="Subministraments">Subministraments</option>
+                                    <option value="Serveis">Serveis</option>
+                                    <option value="Obres">Obres</option>
+                                </select>
+                                <select 
+                                    className="h-10 px-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full cursor-pointer" 
+                                    value={searchParams.estat_actual} 
+                                    onChange={(e) => setSearchParams({ ...searchParams, estat_actual: e.target.value })}
+                                >
+                                    <option value="">Estat</option>
+                                    <option value="En execució">En execució</option>
+                                    <option value="Finalitzat">Finalitzat</option>
+                                    <option value="Rescrit">Rescrit</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Adjudicatari</label>
+                            <input 
+                                type="text" 
+                                className="h-10 px-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full placeholder:text-slate-400" 
+                                placeholder="NIF o nom..." 
+                                value={searchParams.adjudicatari_nom} 
+                                onChange={(e) => setSearchParams({...searchParams, adjudicatari_nom: e.target.value})} 
+                            />
+                        </div>
+
+                        <div className="lg:col-span-2 space-y-3">
+                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Alertes i estats</label>
+                            <div className="flex flex-wrap items-center gap-6 pt-1">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className="relative flex items-center">
+                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer" checked={searchParams.te_prorroga === 'true'} onChange={(e) => setSearchParams({ ...searchParams, te_prorroga: e.target.checked ? 'true' : '' })} />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-600 transition-colors">Prorrogables</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className="relative flex items-center">
+                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-red-600 focus:ring-red-500 transition-all cursor-pointer" checked={searchParams.alerta_finalitzacio === 'true'} onChange={(e) => setSearchParams({ ...searchParams, alerta_finalitzacio: e.target.checked ? 'true' : '' })} />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-600 group-hover:text-red-600 transition-colors">Alerta Finalització</span>
+                                </label>
+                                {canAssign && (
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                        <div className="relative flex items-center">
+                                            <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer" checked={searchParams.sense_departament} onChange={(e) => setSearchParams({ ...searchParams, sense_departament: e.target.checked })} />
+                                        </div>
+                                        <span className="text-xs font-bold text-orange-600 group-hover:text-orange-500 transition-colors">Sense assignar</span>
+                                    </label>
+                                )}
+                                <button onClick={handleResetFilters} className="h-9 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] rounded-xl transition-all font-bold uppercase ml-auto active:scale-95 shadow-sm border border-slate-200">Netejar filtres</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="glass-card flex-1 flex flex-col overflow-hidden min-h-0">
                 <div className="flex-1 overflow-auto">
                     {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="loading-spinner w-10 h-10"></div>
-                        </div>
+                        <div className="flex items-center justify-center h-64"><div className="loading-spinner"></div></div>
                     ) : contratos.length === 0 ? (
-                        <div className="text-center py-12">
-                            <p className="text-slate-500">No s'han trobat contractes</p>
+                        <div className="flex flex-col items-center justify-center h-64 text-center opacity-60">
+                             <FileText size={48} className="text-slate-200 mb-2" />
+                             <p className="text-sm font-medium text-slate-400 tracking-tight uppercase tracking-widest">Cap contracte trobat</p>
                         </div>
                     ) : (
-                        <table className="table border-collapse w-full">
-                            <thead className="bg-slate-50 sticky top-0 z-10">
+                        <table className="table border-collapse w-full text-sm">
+                            <thead className="bg-slate-50/80 backdrop-blur sticky top-0 z-10 border-b border-slate-100">
                                 <tr>
                                     {canAssign && (
-                                        <th className="w-10 text-center px-4 py-3">
-                                            <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600"
-                                                checked={contratos.length > 0 && selectedContracts.size === contratos.length}
-                                                onChange={toggleAllContracts}
-                                            />
+                                        <th className="w-10 text-center px-4 py-3 bg-slate-50 border-b border-slate-100">
+                                            <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer" checked={contratos.length > 0 && selectedContracts.size === contratos.length} onChange={toggleAllContracts} />
                                         </th>
                                     )}
                                     <SortableTh label="Expedient" sortKey="codi_expedient" sortConfig={sortConfig} onSort={requestSort} />
                                     <SortableTh label="Objecte" sortKey="objecte_contracte" sortConfig={sortConfig} onSort={requestSort} />
                                     <SortableTh label="Adjudicatari" sortKey="adjudicatari_nom" sortConfig={sortConfig} onSort={requestSort} />
+                                    <th className="px-4 py-3 bg-slate-50 border-b border-slate-100 text-[11px] uppercase font-bold text-slate-500 tracking-wider text-center">Atributs</th>
                                     <SortableTh label="Import" sortKey="import_adjudicacio_amb_iva" sortConfig={sortConfig} onSort={requestSort} />
-                                    <SortableTh label="Data Inici" sortKey="data_inici" sortConfig={sortConfig} onSort={requestSort} />
-                                    <SortableTh label="Estat" sortKey="estat_actual" sortConfig={sortConfig} onSort={requestSort} />
-                                    <th className="px-4 py-3"></th>
+                                    <SortableTh label="Fase" sortKey="estat_actual" sortConfig={sortConfig} onSort={requestSort} />
+                                    <th className="px-4 py-3 bg-slate-50 border-b border-slate-100"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-100 bg-white">
                                 {contratos.map((contrato) => (
-                                    <tr key={contrato.id} className={`${contrato.possiblement_finalitzat ? 'bg-red-50/50' : contrato.alerta_finalitzacio ? 'bg-yellow-50/50' : ''} ${selectedContracts.has(contrato.id) ? 'bg-primary-50/50' : ''}`}>
+                                    <tr 
+                                        key={contrato.id} 
+                                        className={`cursor-pointer transition-colors group ${contrato.possiblement_finalitzat ? 'bg-red-50/30 hover:bg-red-100/30' : contrato.alerta_finalitzacio ? 'bg-yellow-50/30 hover:bg-yellow-100/30' : 'hover:bg-slate-50/80'} ${selectedContracts.has(contrato.id) ? 'bg-primary-50/70' : ''}`}
+                                        onClick={() => navigate(`/contratos/${contrato.id}`)}
+                                    >
                                         {canAssign && (
-                                            <td className="text-center px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                                                <input 
-                                                    type="checkbox"
-                                                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer"
-                                                    checked={selectedContracts.has(contrato.id)}
-                                                    onChange={() => toggleContractSelect(contrato.id)}
-                                                />
+                                            <td className="text-center px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer" checked={selectedContracts.has(contrato.id)} onChange={() => toggleContractSelect(contrato.id)} />
                                             </td>
                                         )}
-                                        <td className="px-4 py-4">
+                                        <td className="px-4 py-3">
                                             <div className="flex flex-col gap-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="font-medium text-slate-800">{contrato.codi_expedient}</span>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="font-semibold text-slate-800 text-[13px]">{contrato.codi_expedient}</span>
                                                     {getEstadoInternoBadge(contrato.estado_interno)}
                                                     {getExpirationBadge(contrato)}
-                                                    {getProrroguesBadge(contrato)}
-                                                    {contrato.num_lots && contrato.num_lots > 1 && (
-                                                        <span className="badge bg-purple-100 text-purple-800 flex items-center gap-1" title={`${contrato.num_lots} lots`}>
-                                                            <Layers size={12} />
-                                                            {contrato.num_lots} lots
-                                                        </span>
-                                                    )}
                                                 </div>
-                                                {contrato.departamento_id && (
-                                                    <div className="text-xs text-primary-700 bg-primary-50 py-0.5 px-2 rounded-md w-max border border-primary-100 flex items-center gap-1">
-                                                        {departamentos.find(d => d.id === contrato.departamento_id)?.nombre || "Departament Asignat"}
+                                                {contrato.departamento_id && <div className="text-[10px] text-primary-600 font-bold uppercase tracking-tight">{departamentos.find(d => d.id === contrato.departamento_id)?.nombre || "Dep."}</div>}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span 
+                                                className="text-slate-600 line-clamp-1 text-[13px] hover:text-slate-900 transition-colors" 
+                                                title={contrato.objecte_contracte || ''}
+                                            >
+                                                {contrato.objecte_contracte || '-'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-700 text-[13px] truncate max-w-[200px]">{contrato.adjudicatari_nom || '-'}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center justify-center gap-3">
+                                                {(contrato.num_lots ?? 0) > 0 && (
+                                                    <div className="relative w-6 h-6 flex items-center justify-center" title={`${contrato.num_lots} Lots`}>
+                                                        <span className="text-[12px] font-bold text-blue-300">L</span>
+                                                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-blue-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm border border-white">
+                                                            {contrato.num_lots}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {(contrato.num_prorrogues ?? 0) > 0 && (
+                                                    <div className="relative w-6 h-6 flex items-center justify-center" title={`${contrato.num_prorrogues} Pròrrogues`}>
+                                                        <span className="text-[12px] font-bold text-purple-300">P</span>
+                                                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-purple-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm border border-white">
+                                                            {contrato.num_prorrogues}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {((contrato as any).num_modificacions ?? 0) > 0 && (
+                                                    <div className="relative w-6 h-6 flex items-center justify-center" title={`${(contrato as any).num_modificacions} Modificacions`}>
+                                                        <span className="text-[12px] font-bold text-orange-300">M</span>
+                                                        <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-orange-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm border border-white">
+                                                            {(contrato as any).num_modificacions}
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-4 py-4">
-                                            <span
-                                                className="text-slate-600 line-clamp-2"
-                                                title={contrato.objecte_contracte || ''}
-                                            >
-                                                {contrato.objecte_contracte
-                                                    ? contrato.objecte_contracte.substring(0, 80) +
-                                                    (contrato.objecte_contracte.length > 80 ? '...' : '')
-                                                    : '-'}
+                                        <td className="px-4 py-3 font-bold text-slate-800 text-[13px] text-right tabular-nums whitespace-nowrap">{formatCurrency(contrato.import_adjudicacio_amb_iva)}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold whitespace-nowrap block text-center">
+                                                {contrato.estat_actual || '-'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-4 text-slate-700">{contrato.adjudicatari_nom || '-'}</td>
-                                        <td className="px-4 py-4 font-medium text-slate-800 number-display">
-                                            {formatCurrency(contrato.import_adjudicacio_amb_iva)}
-                                        </td>
-                                        <td className="px-4 py-4 text-slate-600">{formatDate(contrato.data_inici)}</td>
-                                        <td className="px-4 py-4">
-                                            <span className="badge badge-info">{contrato.estat_actual || '-'}</span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <Link
-                                                to={`/contratos/${contrato.id}`}
-                                                className="btn btn-secondary p-2"
-                                                title="Veure detall"
-                                            >
-                                                <ExternalLink size={16} />
-                                            </Link>
-                                        </td>
+                                        <td className="px-4 py-3 text-right"><ChevronRight size={16} className="text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" /></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -490,31 +404,44 @@ export default function Contratos() {
                     )}
                 </div>
 
-                {/* Pagination */}
                 {contratos.length > 0 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/30">
-                        <p className="text-sm text-slate-500 font-medium">
-                            Mostrant <span className="text-slate-800">{page * LIMIT + 1}</span> - <span className="text-slate-800">{page * LIMIT + contratos.length}</span>
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => setPage(Math.max(0, page - 1))}
-                                disabled={page === 0}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => setPage(page + 1)}
-                                disabled={contratos.length < LIMIT}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
+                    <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                        <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium">
+                            <span>Mostrant {page * limit + 1}-{page * limit + contratos.length}</span>
+                            <select className="bg-transparent border-none py-0 pl-1 pr-6 focus:ring-0 cursor-pointer hover:text-slate-800 outline-none" value={limit} onChange={(e) => { const newLimit = parseInt(e.target.value); setLimit(newLimit); setPage(0); localStorage.setItem('contratos_limit', newLimit.toString()); }}>
+                                <option value="50">Veure 50</option><option value="100">Veure 100</option><option value="200">Veure 200</option><option value="500">Veure 500</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}><ChevronLeft size={16} /></button>
+                            <span className="text-[11px] font-bold px-2 text-slate-700 font-mono">PÀGINA {page + 1}</span>
+                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => setPage(page + 1)} disabled={contratos.length < limit}><ChevronRight size={16} /></button>
                         </div>
                     </div>
                 )}
             </div>
+
+            {selectedContracts.size > 0 && (
+                <div className="fixed bottom-12 left-1/2 -translate-x-1/2 bg-slate-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-6 animate-in slide-in-from-bottom-8 duration-300 z-50 border border-slate-700">
+                    <div className="flex items-center gap-3 border-r border-slate-700 pr-6 mr-1">
+                        <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center font-bold text-sm">{selectedContracts.size}</div>
+                        <span className="text-sm font-bold tracking-tight uppercase tracking-wider text-[10px]">Expedients seleccionats</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        {canAssign && (
+                            <div className="flex items-center gap-2">
+                                <select className="bg-slate-800 border-slate-700 text-white text-xs rounded-lg py-1.5 focus:ring-primary-500" id="floating-assign-select" defaultValue="">
+                                    <option value="" disabled>Assignar a...</option><option value="none">-- Sense Departament --</option>
+                                    {departamentos.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                                </select>
+                                <button className="bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-2" onClick={() => { const select = document.getElementById('floating-assign-select') as HTMLSelectElement; if (select.value) { handleMassAssign(select.value === 'none' ? '' : select.value); select.value = ''; } }}>Assignar</button>
+                            </div>
+                        )}
+                        <button onClick={handleExportCSV} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 transition-colors flex items-center gap-2"><ExternalLink size={14} />Exportar CSV</button>
+                        <button className="text-[10px] uppercase font-bold text-slate-400 hover:text-white transition-colors ml-2" onClick={() => setSelectedContracts(new Set())}>Cancel·lar</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
