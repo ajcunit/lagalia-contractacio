@@ -1,0 +1,83 @@
+﻿
+=================================================================
+[1/5] Contracte: 6454/2024
+  Objecte : prestaci├│ del Servei civisme de Cunit, compost per un coordinador/a, i dos agents/es c├¡vics/ques, am...
+  Tipus   : Serveis
+  CPV BD  : 98133100-5 -- ?
+  CPV exist: SI
+  Netejat : prestaci├│ del Servei civisme de Cunit, compost per un coordinador/a, i dos agent...
+  Tipus IA: servei
+  Kw IA   : ['civisme', 'coordinador', 'agents', 'mediaci├│', 'conviv├¿ncia'] | Divs: ['81', '84']
+  IA Codes: ['84101000', '84104000', '81000000']
+  [KO] CPV ESPERAT NO TROBAT en 21 candidats
+     Candidat: 15871270-7 -- Condiments compostos
+     Candidat: 79223000-3 -- Serveis d'agent de duanes
+     Candidat: 24112000-2 -- Compostos oxigenats inorg├ánics
+     Candidat: 75242110-8 -- Serveis d'agents judicials
+     Candidat: 39812500-2 -- Agents d'estanquitat
+
+=================================================================
+[2/5] Contracte: 10455/2023
+  Objecte : Serveis de consultoria per a la preparaci├│ i tramitaci├│ de subvencions amb destinaci├│ a les entitats...
+  Tipus   : Serveis
+  CPV BD  : 72224000-1 -- ?
+  CPV exist: SI
+  Netejat : consultoria per a la preparaci├│ i tramitaci├│ de subvencions amb destinaci├│ a les...
+  Tipus IA: servei
+  Kw IA   : ['consultoria', 'subvencions', 'entitats', 'locals', 'catalunya', 'preparaci├│'] | Divs: ['70']
+  IA Codes: ['70120000', '70221000', '70225000']
+  [KO] CPV ESPERAT NO TROBAT en 26 candidats
+     Candidat: 22455000-4 -- Carnets d'identitat
+     Candidat: 45213221-8 -- Treballs de construcci├│ de locals d'emmagatzematge
+     Candidat: 45111000-8 -- Treballs de demolici├│, preparaci├│ i neteja del ter
+     Candidat: 45111200-0 -- Treballs de preparaci├│ i neteja del terreny
+     Candidat: 66518300-7 -- Serveis de tramitaci├│ de sinistres
+
+=================================================================
+[3/5] Contracte: 9593/2023
+  Objecte : 1.4.6. CONTRACTE MENOR ENTRE 6.000 i 9.999 - ÔÇ£SUBMINISTRAMENT MOBILIARI SALA DE PLENS AJUNTAMENT I R...
+  Tipus   : Subministraments
+  CPV BD  : 39100000-3 -- ?
+  CPV exist: SI
+  Netejat : 1.4.6. CONTRACTE MENOR ENTRE 6.000 i 9.999 - ÔÇ£SUBMINISTRAMENT MOBILIARI SALA DE ...
+  Tipus IA: subministrament
+  Kw IA   : ['mobiliari', 'sala', 'plens', 'ajuntament', 'tecnologia'] | Divs: ['15', '90']
+  IA Codes: ['15000000', '15002000', '15900000']
+  [KO] CPV ESPERAT NO TROBAT en 33 candidats
+     Candidat: 50312600-1 -- Manteniment i reparaci├│ d'equips de tecnologia de 
+     Candidat: 50312620-7 -- Reparaci├│ d'equips de tecnologia de la informaci├│
+     Candidat: 39156000-0 -- Mobles de recepci├│ i sala d'espera
+     Candidat: 39143000-6 -- Mobles de dormitori, menjador i sala d'estar
+     Candidat: 33111700-8 -- Sala d'angiografia
+
+=================================================================
+[4/5] Contracte: 2844/2020
+  Objecte : Contractaci├│ de les obres necess├áries per tal d'executar, repintar la senyalitzaci├│ horitzontal exis...
+  Tipus   : Obres
+  CPV BD  : 44811000-8 -- ?
+  CPV exist: SI
+  Netejat : obres necess├áries per tal d'executar, repintar la senyalitzaci├│ horitzontal exis...
+  Tipus IA: obra
+  Kw IA   : ['senyalitzaci├│', 'vials', 'cunit', 'reposici├│', 'repintar'] | Divs: ['45', '47']
+  IA Codes: ['45112300', '45211100', '45500000']
+  [KO] CPV ESPERAT NO TROBAT en 41 candidats
+     Candidat: 45500000-2 -- Lloguer de maquin├ária i equips de construcci├│ i d'
+     Candidat: 31620000-8 -- Aparells de senyalitzaci├│ ac├║stica o visual
+     Candidat: 30193900-7 -- Faristol de sobretaula
+     Candidat: 45000000-7 -- Treballs de construcci├│
+     Candidat: 30197310-2 -- Obrecartes
+
+=================================================================
+[5/5] Contracte: 1887/2025
+  Objecte : Servei professional dÔÇÖarquitectura i afins per lÔÇÖAjuntament de Cunit.
+  Tipus   : Serveis
+  CPV BD  : 71000000-8 -- ?
+  CPV exist: SI
+  Netejat : Servei professional dÔÇÖarquitectura i afins per lÔÇÖAjuntament de Cunit.
+  Tipus IA: servei
+  Kw IA   : ['professional', 'arquitectura', 'ajuntament', 'cunit'] | Divs: ['34', '35']
+  IA Codes: ['34090000', '34120000', '34130000']
+  [OK] CPV ESPERAT TROBAT entre 34 candidats
+
+=================================================================
+RESULTAT: 1/5 CPVs esperats en candidats textuals (20%)

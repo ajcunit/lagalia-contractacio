@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { 
     Search, 
@@ -22,50 +22,96 @@ import FavoriteButton from '../components/FavoriteButton';
 
 export default function SuperBuscador() {
     const navigate = useNavigate();
-    const [q, setQ] = useState('');
-    const [organisme, setOrganisme] = useState('');
-    const [objecte, setObjecte] = useState('');
-    const [minImporte, setMinImporte] = useState<string>('');
-    const [maxImporte, setMaxImporte] = useState<string>('');
-    const [fechaDesde, setFechaDesde] = useState('');
-    const [fechaHasta, setFechaHasta] = useState('');
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    const [q, setQ] = useState(searchParams.get('q') || '');
+    const [organisme, setOrganisme] = useState(searchParams.get('organisme') || '');
+    const [objecte, setObjecte] = useState(searchParams.get('objecte') || '');
+    const [minImporte, setMinImporte] = useState<string>(searchParams.get('minImporte') || '');
+    const [maxImporte, setMaxImporte] = useState<string>(searchParams.get('maxImporte') || '');
+    const [fechaDesde, setFechaDesde] = useState(searchParams.get('fechaDesde') || '');
+    const [fechaHasta, setFechaHasta] = useState(searchParams.get('fechaHasta') || '');
     
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [offset, setOffset] = useState(0);
-    const [showFilters, setShowFilters] = useState(false);
+    const [offset, setOffset] = useState(Number(searchParams.get('offset')) || 0);
+    const [showFilters, setShowFilters] = useState(!!(searchParams.get('organisme') || searchParams.get('objecte') || searchParams.get('minImporte') || searchParams.get('maxImporte') || searchParams.get('fechaDesde') || searchParams.get('fechaHasta')));
     
     const limit = 24; // 3 columns * 8 rows
 
-    const handleSearch = async (e?: React.FormEvent, newOffset = 0) => {
+    // This function only updates the URL. The useEffect below will handle the actual fetching.
+    const handleSearch = (e?: React.FormEvent, newOffset = 0) => {
         if (e) e.preventDefault();
+        
+        const params: any = { 
+            q, 
+            organisme, 
+            objecte, 
+            minImporte, 
+            maxImporte, 
+            fechaDesde, 
+            fechaHasta, 
+            offset: newOffset 
+        };
+        const cleanParams = Object.fromEntries(
+            Object.entries(params).filter(([_, v]) => v !== '' && v !== 0 && v !== undefined && v !== null)
+        );
+        
+        setSearchParams(cleanParams as any);
+        setOffset(newOffset);
+    };
+
+    const performActualSearch = async (searchValues: any) => {
         setLoading(true);
         setError(null);
-        setOffset(newOffset);
         
         try {
             const response = await api.searchGlobalContracts({
-                q,
-                organisme,
-                objecte,
-                min_importe: minImporte ? Number(minImporte) : undefined,
-                max_importe: maxImporte ? Number(maxImporte) : undefined,
-                fecha_desde: fechaDesde || undefined,
-                fecha_hasta: fechaHasta || undefined,
+                q: searchValues.q || undefined,
+                organisme: searchValues.organisme || undefined,
+                objecte: searchValues.objecte || undefined,
+                min_importe: searchValues.minImporte ? Number(searchValues.minImporte) : undefined,
+                max_importe: searchValues.maxImporte ? Number(searchValues.maxImporte) : undefined,
+                fecha_desde: searchValues.fechaDesde || undefined,
+                fecha_hasta: searchValues.fechaHasta || undefined,
                 limit,
-                offset: newOffset
+                offset: Number(searchValues.offset) || 0
             });
             setResults(response.results);
-            if (response.results.length === 0 && newOffset === 0) {
+            if (response.results.length === 0 && (!searchValues.offset || searchValues.offset == 0)) {
                 setError("No s'han trobat contractes amb aquests criteris.");
             }
         } catch (err: any) {
-            setError(err.message || "Error en cercar a la plataforma");
+            setError(err.message || "Error en cercar a l'API");
         } finally {
             setLoading(false);
         }
     };
+
+    // Auto-search and sync state when URL params change
+    useEffect(() => {
+        const urlParams = Object.fromEntries(searchParams.entries());
+        
+        // Sync internal state with URL (crucial for back button)
+        setQ(urlParams.q || '');
+        setOrganisme(urlParams.organisme || '');
+        setObjecte(urlParams.objecte || '');
+        setMinImporte(urlParams.minImporte || '');
+        setMaxImporte(urlParams.maxImporte || '');
+        setFechaDesde(urlParams.fechaDesde || '');
+        setFechaHasta(urlParams.fechaHasta || '');
+        setOffset(Number(urlParams.offset) || 0);
+
+        // Only perform search if we have any search criteria in the URL
+        if (searchParams.toString()) {
+            performActualSearch(urlParams);
+        } else {
+            // Clear results if URL is totally empty (first time visiting)
+            setResults([]);
+        }
+        
+    }, [searchParams]); // This will trigger on mount AND whenever URL changes (like back button)
 
     const formatCurrency = (amount: any) => {
         if (amount === undefined || amount === null) return '---';

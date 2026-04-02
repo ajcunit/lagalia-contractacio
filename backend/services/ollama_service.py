@@ -2,7 +2,7 @@ import httpx
 import json
 import logging
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import models
 
 logger = logging.getLogger(__name__)

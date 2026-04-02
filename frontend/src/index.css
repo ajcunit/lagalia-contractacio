@@ -7,6 +7,11 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  outline: none !important;
+}
+
+:focus-visible {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 body {

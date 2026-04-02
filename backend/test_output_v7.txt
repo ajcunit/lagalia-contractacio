@@ -1,0 +1,78 @@
+﻿
+=================================================================
+[1/5] Contracte: 4532/2024
+  Objecte : Adquisici├│ d'una vela para el pipican del carrer dels Horts
+  Tipus   : Subministraments
+  CPV BD  : 39225600-1 -- ?
+  CPV exist: SI
+  Netejat : Adquisici├│ d'una vela para el pipican del carrer dels Horts
+  Tipus IA: subministrament
+  Kw IA   : ['vela', 'carrer', 'pipican', 'adquisici├│'] | Divs: ['00', '88']
+  [KO] CPV ESPERAT NO TROBAT en 36 candidats
+     Candidat: 15131000-5 -- Conserves i preparacions c├árnies
+     Candidat: 90612000-0 -- Serveis d'escombrada de carrers
+     Candidat: 09221200-6 -- Parafina
+     Candidat: 90611000-3 -- Serveis de neteja de carrers
+     Candidat: 34928500-3 -- Equip d'enllumenat de carrers
+
+=================================================================
+[2/5] Contracte: 8426/2022
+  Objecte : Obres de reurbanitzaci├│ dels vials c/ Major (entre Francesc Maci├á i c/ del Mar) i el tram situat ent...
+  Tipus   : Obres
+  CPV BD  : 45233200-1 -- ?
+  CPV exist: SI
+  Netejat : reurbanitzaci├│ dels vials c/ Major (entre Francesc Maci├á i c/ del Mar) i el tram...
+  Tipus IA: obra
+  Kw IA   : ['reurbanitzaci├│', 'vials', 'tram', 'pla├ºa', 'municipi'] | Divs: ['71', '45']
+  [KO] CPV ESPERAT NO TROBAT en 32 candidats
+     Candidat: 30199240-4 -- Material de publitramesa
+     Candidat: 45214700-7 -- Treballs de construcci├│ de col┬Àlegis majors
+     Candidat: 32333000-6 -- Aparells d'enregistrament o reproducci├│ de v├¡deo
+     Candidat: 45223220-4 -- Treballs d'obra major
+     Candidat: 34922100-7 -- Marques vials
+
+=================================================================
+[3/5] Contracte: 7762/2024
+  Objecte : Els treballs continguts en el projecte de reforma de la climatitzaci├│ i aportaci├│ de l'aire primari ...
+  Tipus   : Obres
+  CPV BD  : 45331000-6 -- ?
+  CPV exist: SI
+  Netejat : Els treballs continguts en el projecte de reforma de la climatitzaci├│ i aportaci...
+  Tipus IA: servei
+  Kw IA   : ['climatitzaci├│', 'aire', 'reforma', 'llar'] | Divs: ['26', '36']
+  [KO] CPV ESPERAT NO TROBAT en 49 candidats
+     Candidat: 19511200-3 -- Cambres d'aire
+     Candidat: 48780000-9 -- Paquets de programes de gesti├│ de sistemes, d'emma
+     Candidat: 31224810-3 -- Cables allargadors
+     Candidat: 37533300-6 -- Soles dels tacs de billar
+     Candidat: 33111200-3 -- Estacions de treball de radiologia
+
+=================================================================
+[4/5] Contracte: 8460/2025
+  Objecte : 1.4.6. Contracte menor de 10.000 o m├®s - Lloguer d'un carret├│ elevador
+  Tipus   : Serveis
+  CPV BD  : 42415100-9 -- ?
+  CPV exist: SI
+  Netejat : 1.4.6. Contracte menor de 10.000 o m├®s - Lloguer d'un carret├│ elevador
+  Tipus IA: subministrament
+  Kw IA   : ['carret├│', 'elevador'] | Divs: ['84', '26']
+  [KO] CPV ESPERAT NO TROBAT en 23 candidats
+     Candidat: 33131120-4 -- Instruments de criocirurgia dental, mesuradors de 
+     Candidat: 45510000-5 -- Lloguer de grues amb operador
+     Candidat: 60172000-4 -- Lloguer d'autobusos i autocars amb conductor
+     Candidat: 60180000-3 -- Lloguer de vehicles de transport de mercaderies am
+     Candidat: 60182000-7 -- Lloguer de vehicles industrials amb conductor
+
+=================================================================
+[5/5] Contracte: 3132/2022
+  Objecte : Serveis art├¡stics per la realitzaci├│ dels concerts en la Festa Major d'estiu de Cunit del 8 a l'11 d...
+  Tipus   : Serveis
+  CPV BD  : 92312000-1 -- ?
+  CPV exist: SI
+  Netejat : Serveis art├¡stics per la realitzaci├│ dels concerts en la Festa Major d'estiu de ...
+  Tipus IA: servei
+  Kw IA   : ['art├¡stics', 'concerts', 'musical', 'artista'] | Divs: ['90', '91']
+  [OK] CPV ESPERAT TROBAT entre 31 candidats
+
+=================================================================
+RESULTAT: 1/5 CPVs esperats en candidats textuals (20%)

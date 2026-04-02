@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, Contrato, Prorroga, Empleado } from '../api/client';
 import {
     ArrowLeft,
@@ -24,6 +24,7 @@ import {
 
 
 export default function ContratoDetalle() {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const [contrato, setContrato] = useState<Contrato | null>(null);
     const [loading, setLoading] = useState(true);
@@ -288,9 +289,9 @@ export default function ContratoDetalle() {
         return (
             <div className="glass-card p-6 text-center">
                 <p className="text-red-500 mb-4">{error || 'Contracte no trobat'}</p>
-                <Link to="/contratos" className="btn btn-primary">
+                <button onClick={() => navigate(-1)} className="btn btn-primary">
                     Tornar
-                </Link>
+                </button>
             </div>
         );
     }
@@ -299,9 +300,9 @@ export default function ContratoDetalle() {
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link to="/contratos" className="btn btn-secondary p-2">
+                <button onClick={() => navigate(-1)} className="btn btn-secondary p-2">
                     <ArrowLeft size={20} />
-                </Link>
+                </button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-slate-800">{contrato.codi_expedient}</h1>

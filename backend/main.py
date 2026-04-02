@@ -13,39 +13,39 @@ import models
 
 # Create database tables with retry
 import time
-for i in range(5):
+for i in range(15):
     try:
         Base.metadata.create_all(bind=engine)
         print("INFO:    Database tables synchronized")
+        
+        # Initialize default data (admin user)
+        # We do this here inside the loop to ensure the DB is ready
+        db = SessionLocal()
+        try:
+            admin_user = db.query(models.Empleado).filter(models.Empleado.email == "admin@admin.com").first()
+            if not admin_user:
+                hashed_pw = AuthService.get_password_hash("admin123")
+                new_admin = models.Empleado(
+                    nombre="Administrador",
+                    email="admin@admin.com",
+                    rol="admin",
+                    hashed_password=hashed_pw
+                )
+                db.add(new_admin)
+                db.commit()
+                print("INFO:    Default administrator created")
+        finally:
+            db.close()
+            
         break
     except Exception as e:
-        if i == 4:
-            print(f"ERROR:   Could not sync database: {str(e)}")
-            # Don't raise here, let it fail naturally if needed, 
-            # though usually create_all failing means the app won't work
+        if i == 14:
+            print(f"ERROR:   Could not sync database after 30 seconds: {str(e)}")
+            # At this point the app will likely crash later when a request hits the DB, 
+            # but it allows the logs to be seen.
         else:
-            print(f"INFO:    Waiting for database... (attempt {i+1}/5)")
+            print(f"INFO:    Waiting for database... (attempt {i+1}/15)")
             time.sleep(2)
-
-
-def init_db():
-    db = SessionLocal()
-    try:
-        admin_user = db.query(models.Empleado).filter(models.Empleado.email == "admin@admin.com").first()
-        if not admin_user:
-            hashed_pw = AuthService.get_password_hash("admin123")
-            new_admin = models.Empleado(
-                nombre="Administrador",
-                email="admin@admin.com",
-                rol="admin",
-                hashed_password=hashed_pw
-            )
-            db.add(new_admin)
-            db.commit()
-    finally:
-        db.close()
-
-init_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

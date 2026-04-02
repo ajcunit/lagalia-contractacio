@@ -1,0 +1,83 @@
+﻿
+=================================================================
+[1/5] Contracte: 9750/2022
+  Objecte : Contracte menor de 10.000 o m├®s - Actuaci├│ musical La F├║miga per Festa Major hivern 2023
+  Tipus   : Serveis
+  CPV BD  : 79954000-6 -- ?
+  CPV exist: SI
+  Netejat : 10.000 o m├®s - Actuaci├│ musical La F├║miga per Festa Major hivern 2023
+  Tipus IA: servei
+  Kw IA   : ['10.000', 'actuaci├│', 'musical', 'f├║miga', 'festa', 'major']
+  [KO] CPV ESPERAT NO TROBAT en 21 candidats
+     Candidat: 92621000-0 -- Serveis de promoci├│ de manifestacions esportives
+     Candidat: 37322200-3 -- Capses de m├║sica i mecanismes musicals
+     Candidat: 37321600-0 -- Fundes, estoigs o accessoris d'instruments musical
+     Candidat: 90921000-9 -- Serveis de desinfecci├│ i desinfestaci├│
+     Candidat: 44211500-7 -- Hivernacles
+
+=================================================================
+[2/5] Contracte: 4910/2022
+  Objecte : Serveis de doc├¿ncia per a la realitzaci├│ de les accions de formaci├│ de la Regidoria de Formaci├│ i Oc...
+  Tipus   : Serveis
+  CPV BD  : 80500000-9 -- ?
+  CPV exist: SI
+  Netejat : doc├¿ncia per a la realitzaci├│ de les accions de formaci├│ de la Regidoria de Form...
+  Tipus IA: servei
+  Kw IA   : ['doc├¿ncia', 'realitzaci├│', 'accions', 'formaci├│', 'regidoria', 'formaci├│']
+  [KO] CPV ESPERAT NO TROBAT en 21 candidats
+     Candidat: 37500000-3 -- Jocs i joguines; atraccions de fira
+     Candidat: 37451730-0 -- Material de formaci├│ de futbol
+     Candidat: 35513300-6 -- Vaixells auxiliars de recerca d'informaci├│
+     Candidat: 37535000-7 -- Cavallets, gronxadors, casetes de tir i altres atr
+     Candidat: 37452740-0 -- Ajut a la formaci├│ de tennis
+
+=================================================================
+[3/5] Contracte: 3456/2018
+  Objecte : Servei integral per a la realitzaci├│ de l'enregistrament i posterior publicaci├│ de forma automatitza...
+  Tipus   : Serveis
+  CPV BD  : 64228200-2 -- ?
+  CPV exist: SI
+  Netejat : Servei integral per a la realitzaci├│ de l'enregistrament i posterior publicaci├│ ...
+  Tipus IA: servei
+  Kw IA   : ['integral', 'realitzaci├│', "l'enregistrament", 'posterior', 'publicaci├│', 'forma']
+  [KO] CPV ESPERAT NO TROBAT en 43 candidats
+     Candidat: 33168000-5 -- Aparells d'endosc├▓pia i endocirurgia
+     Candidat: 48910000-0 -- Paquets de programes de jocs inform├átics, jocs per
+     Candidat: 79521000-2 -- Serveis de fotoc├▓pia
+     Candidat: 48131000-5 -- Paquets de programes de suport en terra per a l'av
+     Candidat: 32000000-3 -- Equips i aparells de r├ádio, televisi├│, comunicacio
+
+=================================================================
+[4/5] Contracte: 7648/2025
+  Objecte : 1.4.6. Contracte menor de 10.000 o m├®s - Contractaci├│ dÔÇÖuna activitat vi├ária en entorn l├║dic adre├ºat...
+  Tipus   : Serveis
+  CPV BD  : 48921000-0 -- ?
+  CPV exist: SI
+  Netejat : 1.4.6. Contracte menor de 10.000 o m├®s - Contractaci├│ dÔÇÖuna activitat vi├ária en ...
+  Tipus IA: subministrament
+  Kw IA   : ['1.4.6.', 'contracte', 'menor', '10.000', 'contractaci├│', 'dÔÇÖuna']
+  [KO] CPV ESPERAT NO TROBAT en 27 candidats
+     Candidat: 37480000-6 -- M├áquines o aparells d'activitats d'oci
+     Candidat: 48932000-0 -- Paquets de programes l├║dics
+     Candidat: 72514100-2 -- Serveis d'explotaci├│ d'instal┬Àlacions que implique
+     Candidat: 72212930-7 -- Serveis de desenvolupament de programari de formac
+     Candidat: 90521410-2 -- Transport de deixalles nuclears de baixa activitat
+
+=================================================================
+[5/5] Contracte: 7698/2024
+  Objecte : serveis de redacci├│ de projectes i direcci├│ dÔÇÖobra
+  Tipus   : Serveis
+  CPV BD  : 71000000-8 -- ?
+  CPV exist: SI
+  Netejat : redacci├│ de projectes i direcci├│ dÔÇÖobra
+  Tipus IA: servei
+  Kw IA   : ['redacci├│', 'projectes', 'direcci├│', 'dÔÇÖobra']
+  [KO] CPV ESPERAT NO TROBAT en 14 candidats
+     Candidat: 34327000-5 -- Volants, columnes i caixes de direcci├│
+     Candidat: 34327200-7 -- Columnes i caixes de direcci├│
+     Candidat: 45240000-1 -- Treballs de construcci├│ per a projectes hidr├áulics
+     Candidat: 79421000-1 -- Serveis de gesti├│ de projectes diferents dels de c
+     Candidat: 72224000-1 -- Serveis d'assessorament en gesti├│ de projectes
+
+=================================================================
+RESULTAT: 0/5 CPVs esperats en candidats textuals (0%)

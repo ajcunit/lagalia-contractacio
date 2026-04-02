@@ -1,0 +1,83 @@
+﻿
+=================================================================
+[1/5] Contracte: 7414/2023
+  Objecte : Prestaci├│ serveis per cobrir les necessitats espec├¡fiques dels sistemes de xarxa: electr├▓nica, wifi ...
+  Tipus   : Serveis
+  CPV BD  : 72267000-4 -- ?
+  CPV exist: SI
+  Netejat : Prestaci├│ serveis per cobrir les necessitats espec├¡fiques dels sistemes de xarxa...
+  Tipus IA: servei
+  Kw IA   : ['xarxa', 'wifi', 'firewalls', 'electr├▓nica', 'municipi'] | Divs: ['46', '47']
+  IA Codes: ['46030000', '46040000', '46060000']
+  [KO] CPV ESPERAT NO TROBAT en 35 candidats
+     Candidat: 31642000-8 -- Aparells de detecci├│ electr├▓nica
+     Candidat: 48511000-3 -- Paquets de programes de comunicaci├│ electr├▓nica
+     Candidat: 34954000-9 -- Passarel┬Àles de servei
+     Candidat: 79132100-9 -- Serveis de certificaci├│ de signatura electr├▓nica
+     Candidat: 64216100-4 -- Serveis de missatgeria electr├▓nica
+
+=================================================================
+[2/5] Contracte: 3317/2025
+  Objecte : Rehabilitaci├│ integral del Casal Municipal de Cunit, dins el pla de recuperaci├│, transformaci├│ i res...
+  Tipus   : Obres
+  CPV BD  : 45210000-2 -- ?
+  CPV exist: SI
+  Netejat : Rehabilitaci├│ integral del Casal Municipal de Cunit, dins el pla de recuperaci├│,...
+  Tipus IA: obra
+  Kw IA   : ['rehabilitaci├│', 'municipal', 'transformaci├│', 'resil├¿ncia', 'fons'] | Divs: ['42', '43']
+  IA Codes: ['42020000', '42012000', '42000000']
+  [KO] CPV ESPERAT NO TROBAT en 32 candidats
+     Candidat: 03400000-4 -- Productes de la silvicultura i de l'explotaci├│ for
+     Candidat: 90715280-8 -- Investigaci├│ d'empla├ºaments de planta de transform
+     Candidat: 85322000-2 -- Programa d'acci├│ municipal
+     Candidat: 50117100-9 -- Serveis de transformaci├│ de vehicles
+     Candidat: 48910000-0 -- Paquets de programes de jocs inform├átics, jocs per
+
+=================================================================
+[3/5] Contracte: 4818/2023
+  Objecte : Contractaci├│ pel subministrament de 2 vehicles nous de recollida bilaterals de residu amb capacitat ...
+  Tipus   : Subministraments
+  CPV BD  : 34144511-3 -- ?
+  CPV exist: SI
+  Netejat : Contractaci├│ pel subministrament de 2 vehicles nous de recollida bilaterals de r...
+  Tipus IA: servei
+  Kw IA   : ['vehicles', 'residu', 'capacitat', 'municipal', 'recollida', 'bilaterals'] | Divs: ['45']
+  IA Codes: ['45353000', '45353010', '45353020']
+  [OK] CPV ESPERAT TROBAT entre 51 candidats
+
+=================================================================
+[4/5] Contracte: 10225/2023 (segona fase)
+  Objecte : (Segona fase-fase d'adjudicaci├│) Concurs de projectes per la contractaci├│ de la redacci├│ del project...
+  Tipus   : Serveis
+  CPV BD  : 71200000-0 -- ?
+  CPV exist: SI
+  Netejat : (Segona fase-fase d'adjudicaci├│) Concurs de projectes per la contractaci├│ de la ...
+  Tipus IA: servei
+  Kw IA   : ['projectes', 'rehabilitaci├│', 'direcci├│', 'construcci├│', 'seguretat', 'recuperaci├│'] | Divs: ['42', '43']
+  IA Codes: ['42310000', '42350000', '42720000']
+  [KO] CPV ESPERAT NO TROBAT en 58 candidats
+     Candidat: 44622000-6 -- Sistemes de recuperaci├│ de calor
+     Candidat: 18444200-5 -- Cascos de seguretat
+     Candidat: 18444100-4 -- Lligadures de seguretat
+     Candidat: 45112360-6 -- Treballs de rehabilitaci├│ del s├▓l
+     Candidat: 75231200-6 -- Serveis relacionats amb l'empresonament i la rehab
+
+=================================================================
+[5/5] Contracte: 2123/2023
+  Objecte : adquisici├│ vehicles en sistema renting Ford Kuga 9677MKN
+  Tipus   : Subministraments
+  CPV BD  : 66114000-2 -- ?
+  CPV exist: SI
+  Netejat : adquisici├│ vehicles en sistema renting Ford Kuga 9677MKN
+  Tipus IA: subministrament
+  Kw IA   : ['vehicles', 'renting', 'ford', 'kuga', 'adquisici├│', 'sistema'] | Divs: ['45', '44']
+  IA Codes: ['45131100', '45131200', '45131400']
+  [KO] CPV ESPERAT NO TROBAT en 25 candidats
+     Candidat: 33193000-9 -- Vehicles per a discapacitats, cadires de rodes i m
+     Candidat: 33193110-3 -- Vehicles per a discapacitats
+     Candidat: 32342430-5 -- Sistema de compressi├│ de la parla
+     Candidat: 45000000-7 -- Treballs de construcci├│
+     Candidat: 34114120-6 -- Vehicles d'├║s param├¿dic
+
+=================================================================
+RESULTAT: 1/5 CPVs esperats en candidats textuals (20%)

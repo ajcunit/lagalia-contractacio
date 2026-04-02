@@ -15,16 +15,15 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
     const [user, setUser] = useState<Empleado | null>(null);
     const [selectedContracts, setSelectedContracts] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(0);
-    const [limit, setLimit] = useState(() => {
-        const saved = localStorage.getItem('contratos_limit');
-        return saved ? parseInt(saved) : 50;
-    });
-    const { sortedItems: contratos, sortConfig, requestSort } = useSortableData(contratosRaw);
+    
+    const [urlParams, setUrlParams] = useSearchParams();
 
-    const [urlParams] = useSearchParams();
+    // LOCAL TEXT STATES (for smooth typing)
+    const [localBusqueda, setLocalBusqueda] = useState(urlParams.get('busqueda') || '');
+    const [localAdjudicatari, setLocalAdjudicatari] = useState(urlParams.get('adjudicatari_nom') || '');
 
-    const [searchParams, setSearchParams] = useState({
+    // DERIVED STATE FROM URL
+    const searchState = {
         busqueda: urlParams.get('busqueda') || '',
         estat_actual: urlParams.get('estat_actual') || '',
         tipus_contracte: urlParams.get('tipus_contracte') || '',
@@ -36,18 +35,41 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
         possiblement_finalitzat: urlParams.get('possiblement_finalitzat') || '',
         departamento_id: urlParams.get('departamento_id') || '',
         sense_departament: urlParams.get('sense_departament') === 'true',
-    });
+    };
+
+    const page = Number(urlParams.get('page')) || 0;
+    const limit = Number(urlParams.get('limit')) || 50;
+
+    const { sortedItems: contratos, sortConfig, requestSort } = useSortableData(contratosRaw);
 
     useEffect(() => {
         loadDepartamentos();
         api.getMe().then(setUser).catch(console.error);
     }, []);
 
+    // Main data fetching effect: depends only on URL
     useEffect(() => {
+        // Sync local text states with URL (crucial for back button)
+        setLocalBusqueda(urlParams.get('busqueda') || '');
+        setLocalAdjudicatari(urlParams.get('adjudicatari_nom') || '');
+        
         loadContratos();
         setSelectedContracts(new Set());
-    }, [page, limit, searchParams]);
-    
+    }, [urlParams]); 
+
+    const updateURL = (newFilters: any) => {
+        const nextParams = Object.fromEntries(urlParams.entries());
+        const resetPage = !('page' in newFilters) && !('limit' in newFilters);
+        
+        const merged = { ...nextParams, ...newFilters, tab: 'ordinarios' };
+        if (resetPage) merged.page = '0';
+        
+        const cleanParams = Object.fromEntries(
+            Object.entries(merged).filter(([_, v]) => v !== '' && v !== false && v !== undefined && v !== null && v !== '0')
+        );
+        setUrlParams(cleanParams as any);
+    };
+
     const loadDepartamentos = async () => {
         try {
             const depts = await api.getDepartamentos();
@@ -63,21 +85,22 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
             const params: Record<string, string | number | boolean> = {
                 skip: page * limit,
                 limit: limit,
-                busqueda: searchParams.busqueda,
-                estat_actual: searchParams.estat_actual,
-                tipus_contracte: searchParams.tipus_contracte,
-                estado_interno: searchParams.estado_interno,
-                adjudicatari_nom: searchParams.adjudicatari_nom,
+                busqueda: searchState.busqueda,
+                estat_actual: searchState.estat_actual,
+                tipus_contracte: searchState.tipus_contracte,
+                estado_interno: searchState.estado_interno,
+                adjudicatari_nom: searchState.adjudicatari_nom,
             };
 
-            if (searchParams.departamento_id) params.departamento_id = parseInt(searchParams.departamento_id);
-            if (searchParams.te_prorroga !== '') params.te_prorroga = searchParams.te_prorroga === 'true';
-            if (searchParams.alerta_finalitzacio !== '') params.alerta_finalitzacio = searchParams.alerta_finalitzacio === 'true';
-            if (searchParams.possiblement_finalitzat !== '') params.possiblement_finalitzat = searchParams.possiblement_finalitzat === 'true';
-            if (searchParams.sense_departament) params.sense_departament = true;
+            if (searchState.departamento_id) params.departamento_id = parseInt(searchState.departamento_id);
+            if (searchState.te_prorroga === 'true') params.te_prorroga = true;
+            if (searchState.te_prorroga === 'false') params.te_prorroga = false;
+            if (searchState.alerta_finalitzacio === 'true') params.alerta_finalitzacio = true;
+            if (searchState.possiblement_finalitzat === 'true') params.possiblement_finalitzat = true;
+            if (searchState.sense_departament) params.sense_departament = true;
 
-            if (searchParams.any_adjudicacio) {
-                const year = parseInt(searchParams.any_adjudicacio);
+            if (searchState.any_adjudicacio) {
+                const year = parseInt(searchState.any_adjudicacio);
                 params.fecha_inicio_desde = `${year}-01-01`;
                 params.fecha_inicio_hasta = `${year}-12-31`;
             }
@@ -148,29 +171,25 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     const handleResetFilters = () => {
-        setSearchParams({
-            busqueda: '', estat_actual: '', tipus_contracte: '', estado_interno: '',
-            adjudicatari_nom: '', any_adjudicacio: '', te_prorroga: '',
-            alerta_finalitzacio: '', possiblement_finalitzat: '', departamento_id: '',
-            sense_departament: false,
-        });
-        setPage(0);
+        setLocalBusqueda('');
+        setLocalAdjudicatari('');
+        setUrlParams({ tab: 'ordinarios' });
     };
 
     const handleExportCSV = () => {
         const params = new URLSearchParams();
-        params.append('busqueda', searchParams.busqueda);
-        if (searchParams.estat_actual) params.append('estat_actual', searchParams.estat_actual);
-        if (searchParams.tipus_contracte) params.append('tipus_contracte', searchParams.tipus_contracte);
-        if (searchParams.estado_interno) params.append('estado_interno', searchParams.estado_interno);
-        if (searchParams.adjudicatari_nom) params.append('adjudicatari_nom', searchParams.adjudicatari_nom);
-        if (searchParams.departamento_id) params.append('departamento_id', searchParams.departamento_id);
-        if (searchParams.te_prorroga !== '') params.append('te_prorroga', searchParams.te_prorroga);
-        if (searchParams.alerta_finalitzacio !== '') params.append('alerta_finalitzacio', searchParams.alerta_finalitzacio);
-        if (searchParams.possiblement_finalitzat !== '') params.append('possiblement_finalitzat', searchParams.possiblement_finalitzat);
-        if (searchParams.sense_departament) params.append('sense_departament', 'true');
-        if (searchParams.any_adjudicacio) {
-            const year = parseInt(searchParams.any_adjudicacio);
+        params.append('busqueda', searchState.busqueda);
+        if (searchState.estat_actual) params.append('estat_actual', searchState.estat_actual);
+        if (searchState.tipus_contracte) params.append('tipus_contracte', searchState.tipus_contracte);
+        if (searchState.estado_interno) params.append('estado_interno', searchState.estado_interno);
+        if (searchState.adjudicatari_nom) params.append('adjudicatari_nom', searchState.adjudicatari_nom);
+        if (searchState.departamento_id) params.append('departamento_id', searchState.departamento_id);
+        if (searchState.te_prorroga !== '') params.append('te_prorroga', searchState.te_prorroga);
+        if (searchState.alerta_finalitzacio !== '') params.append('alerta_finalitzacio', searchState.alerta_finalitzacio);
+        if (searchState.possiblement_finalitzat !== '') params.append('possiblement_finalitzat', searchState.possiblement_finalitzat);
+        if (searchState.sense_departament) params.append('sense_departament', 'true');
+        if (searchState.any_adjudicacio) {
+            const year = parseInt(searchState.any_adjudicacio);
             params.append('fecha_inicio_desde', `${year}-01-01`);
             params.append('fecha_inicio_hasta', `${year}-12-31`);
         }
@@ -205,18 +224,20 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                         type="text" 
                         placeholder="Cerca per expedient, projecte o paraula clau..." 
                         className="bg-transparent border-none focus:ring-0 w-full text-sm text-slate-700 placeholder:text-slate-400 font-medium"
-                        value={searchParams.busqueda}
-                        onChange={(e) => setSearchParams({ ...searchParams, busqueda: e.target.value })}
+                        value={localBusqueda}
+                        onChange={(e) => setLocalBusqueda(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && updateURL({ busqueda: localBusqueda })}
+                        onBlur={() => updateURL({ busqueda: localBusqueda })}
                     />
                 </div>
 
                 <div className="flex items-center gap-2 px-1">
-                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[140px]" value={searchParams.departamento_id} onChange={(e) => setSearchParams({ ...searchParams, departamento_id: e.target.value })}>
+                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[140px]" value={searchState.departamento_id} onChange={(e) => updateURL({ departamento_id: e.target.value })}>
                         <option value="">Departaments</option>
                         {departamentos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
                     </select>
 
-                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[100px]" value={searchParams.any_adjudicacio} onChange={(e) => setSearchParams({ ...searchParams, any_adjudicacio: e.target.value })}>
+                    <select className="h-10 px-4 bg-slate-50 border-transparent rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer focus:ring-0 min-w-[100px]" value={searchState.any_adjudicacio} onChange={(e) => updateURL({ any_adjudicacio: e.target.value })}>
                         <option value="">Exercicis</option>
                         {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - i).map(year => <option key={year} value={year}>{year}</option>)}
                     </select>
@@ -242,8 +263,8 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                             <div className="grid grid-cols-2 gap-3">
                                 <select 
                                     className="h-10 px-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full cursor-pointer" 
-                                    value={searchParams.tipus_contracte} 
-                                    onChange={(e) => setSearchParams({ ...searchParams, tipus_contracte: e.target.value })}
+                                    value={searchState.tipus_contracte} 
+                                    onChange={(e) => updateURL({ tipus_contracte: e.target.value })}
                                 >
                                     <option value="">Tipus</option>
                                     <option value="Subministraments">Subministraments</option>
@@ -252,8 +273,8 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                                 </select>
                                 <select 
                                     className="h-10 px-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full cursor-pointer" 
-                                    value={searchParams.estat_actual} 
-                                    onChange={(e) => setSearchParams({ ...searchParams, estat_actual: e.target.value })}
+                                    value={searchState.estat_actual} 
+                                    onChange={(e) => updateURL({ estat_actual: e.target.value })}
                                 >
                                     <option value="">Estat</option>
                                     <option value="En execució">En execució</option>
@@ -269,8 +290,10 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                                 type="text" 
                                 className="h-10 px-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:border-primary-200 focus:ring-4 focus:ring-primary-500/5 transition-all outline-none w-full placeholder:text-slate-400" 
                                 placeholder="NIF o nom..." 
-                                value={searchParams.adjudicatari_nom} 
-                                onChange={(e) => setSearchParams({...searchParams, adjudicatari_nom: e.target.value})} 
+                                value={localAdjudicatari} 
+                                onChange={(e) => setLocalAdjudicatari(e.target.value)} 
+                                onKeyDown={(e) => e.key === 'Enter' && updateURL({ adjudicatari_nom: localAdjudicatari })}
+                                onBlur={() => updateURL({ adjudicatari_nom: localAdjudicatari })}
                             />
                         </div>
 
@@ -279,20 +302,20 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                             <div className="flex flex-wrap items-center gap-6 pt-1">
                                 <label className="flex items-center gap-3 cursor-pointer group">
                                     <div className="relative flex items-center">
-                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer" checked={searchParams.te_prorroga === 'true'} onChange={(e) => setSearchParams({ ...searchParams, te_prorroga: e.target.checked ? 'true' : '' })} />
+                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-primary-600 focus:ring-primary-500 transition-all cursor-pointer" checked={searchState.te_prorroga === 'true'} onChange={(e) => updateURL({ te_prorroga: e.target.checked ? 'true' : '' })} />
                                     </div>
                                     <span className="text-xs font-bold text-slate-600 group-hover:text-primary-600 transition-colors">Prorrogables</span>
                                 </label>
                                 <label className="flex items-center gap-3 cursor-pointer group">
                                     <div className="relative flex items-center">
-                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-red-600 focus:ring-red-500 transition-all cursor-pointer" checked={searchParams.alerta_finalitzacio === 'true'} onChange={(e) => setSearchParams({ ...searchParams, alerta_finalitzacio: e.target.checked ? 'true' : '' })} />
+                                        <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-red-600 focus:ring-red-500 transition-all cursor-pointer" checked={searchState.alerta_finalitzacio === 'true'} onChange={(e) => updateURL({ alerta_finalitzacio: e.target.checked ? 'true' : '' })} />
                                     </div>
                                     <span className="text-xs font-bold text-slate-600 group-hover:text-red-600 transition-colors">Alerta Finalització</span>
                                 </label>
                                 {canAssign && (
                                     <label className="flex items-center gap-3 cursor-pointer group">
                                         <div className="relative flex items-center">
-                                            <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer" checked={searchParams.sense_departament} onChange={(e) => setSearchParams({ ...searchParams, sense_departament: e.target.checked })} />
+                                            <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-orange-600 focus:ring-orange-500 transition-all cursor-pointer" checked={searchState.sense_departament} onChange={(e) => updateURL({ sense_departament: e.target.checked })} />
                                         </div>
                                         <span className="text-xs font-bold text-orange-600 group-hover:text-orange-500 transition-colors">Sense assignar</span>
                                     </label>
@@ -408,14 +431,14 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                     <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50/50 shrink-0">
                         <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium">
                             <span>Mostrant {page * limit + 1}-{page * limit + contratos.length}</span>
-                            <select className="bg-transparent border-none py-0 pl-1 pr-6 focus:ring-0 cursor-pointer hover:text-slate-800 outline-none" value={limit} onChange={(e) => { const newLimit = parseInt(e.target.value); setLimit(newLimit); setPage(0); localStorage.setItem('contratos_limit', newLimit.toString()); }}>
+                            <select className="bg-transparent border-none py-0 pl-1 pr-6 focus:ring-0 cursor-pointer hover:text-slate-800 outline-none" value={limit} onChange={(e) => { const newLimit = parseInt(e.target.value); updateURL({ limit: newLimit, page: 0 }); localStorage.setItem('contratos_limit', newLimit.toString()); }}>
                                 <option value="50">Veure 50</option><option value="100">Veure 100</option><option value="200">Veure 200</option><option value="500">Veure 500</option>
                             </select>
                         </div>
                         <div className="flex items-center gap-1">
-                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}><ChevronLeft size={16} /></button>
+                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => updateURL({ page: Math.max(0, page - 1) })} disabled={page === 0}><ChevronLeft size={16} /></button>
                             <span className="text-[11px] font-bold px-2 text-slate-700 font-mono">PÀGINA {page + 1}</span>
-                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => setPage(page + 1)} disabled={contratos.length < limit}><ChevronRight size={16} /></button>
+                            <button className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600" onClick={() => updateURL({ page: page + 1 })} disabled={contratos.length < limit}><ChevronRight size={16} /></button>
                         </div>
                     </div>
                 )}

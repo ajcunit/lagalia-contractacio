@@ -18,11 +18,7 @@ import {
     Sun,
     User,
     ChevronUp,
-    Shield,
-    Users,
-    Building,
-    RefreshCw,
-    ScrollText
+    Shield
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -71,7 +67,6 @@ export default function Sidebar() {
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/contratacion', icon: FileText, label: 'Contractació' },
-        { path: '/contratos-menores', icon: ScrollText, label: 'Contractes Menors' },
         ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' 
             ? (pendientes > 0 ? [{ path: '/duplicados', icon: AlertTriangle, label: 'Duplicats', badge: pendientes }] : []) 
             : []),
@@ -157,30 +152,6 @@ export default function Sidebar() {
                             {user?.rol === 'admin' && (
                                 <>
                                     <NavLink
-                                        to="/sincronizacion"
-                                        onClick={() => setUserMenuOpen(false)}
-                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                                    >
-                                        <RefreshCw size={18} />
-                                        <span className="flex-1">Sincronització</span>
-                                    </NavLink>
-                                    <NavLink
-                                        to="/departamentos"
-                                        onClick={() => setUserMenuOpen(false)}
-                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                                    >
-                                        <Building size={18} />
-                                        <span className="flex-1">Departaments</span>
-                                    </NavLink>
-                                    <NavLink
-                                        to="/empleados"
-                                        onClick={() => setUserMenuOpen(false)}
-                                        className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-                                    >
-                                        <Users size={18} />
-                                        <span className="flex-1">Empleats</span>
-                                    </NavLink>
-                                    <NavLink
                                         to="/configuracion"
                                         onClick={() => setUserMenuOpen(false)}
                                         className={({ isActive }) =>
@@ -188,7 +159,7 @@ export default function Sidebar() {
                                         }
                                     >
                                         <Settings size={18} />
-                                        <span className="flex-1">Configuració Sistema</span>
+                                        <span className="flex-1">Configuració</span>
                                     </NavLink>
                                 </>
                             )}
@@ -201,7 +172,7 @@ export default function Sidebar() {
                                 >
                                     <Shield size={18} className={viewMode === 'admin' ? 'text-primary-600' : 'text-slate-400'} />
                                     <span className="flex-1">
-                                        {viewMode === 'admin' ? 'Activar Vista Usuari' : 'Activar Vista Admin'}
+                                        {viewMode === 'admin' ? 'Vista Usuari' : 'Vista Admin'}
                                     </span>
                                 </button>
                             )}

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, ContratoMenor, Departamento, Empleado } from '../api/client';
 import { ArrowLeft, Building2, Calendar, FileText, CheckCircle2, Edit, Save, X, Layers } from 'lucide-react';
 
 export default function ContratoMenorDetalle() {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const [contrato, setContrato] = useState<ContratoMenor | null>(null);
     const [loading, setLoading] = useState(true);
@@ -77,9 +78,9 @@ export default function ContratoMenorDetalle() {
         return (
             <div className="text-center py-12">
                 <h2 className="text-2xl font-bold text-slate-800">Contracte no trobat</h2>
-                <Link to="/contratos-menores" className="btn btn-primary mt-4 inline-flex items-center gap-2">
+                <button onClick={() => navigate(-1)} className="btn btn-primary mt-4 inline-flex items-center gap-2">
                     <ArrowLeft size={16} /> Tornar als contractes
-                </Link>
+                </button>
             </div>
         );
     }
@@ -102,9 +103,9 @@ export default function ContratoMenorDetalle() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Nav */}
             <div className="flex items-center gap-4">
-                <Link to="/contratos-menores" className="btn btn-secondary">
+                <button onClick={() => navigate(-1)} className="btn btn-secondary">
                     <ArrowLeft size={18} className="mr-2" /> Tornar
-                </Link>
+                </button>
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
                         Expedient: {contrato.codi_expedient}

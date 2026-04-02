@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import {
     ArrowLeft,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 export default function SuperContratoDetalle() {
+    const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
     const [contrato, setContrato] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
@@ -146,9 +147,9 @@ export default function SuperContratoDetalle() {
             <div className="glass-card p-6 text-center max-w-2xl mx-auto mt-20">
                 <AlertCircle className="text-red-500 mx-auto mb-4" size={48} />
                 <p className="text-red-700 font-medium mb-4">{error || 'Contracte no trobat'}</p>
-                <Link to="/superbuscador" className="btn btn-primary">
+                <button onClick={() => navigate(-1)} className="btn btn-primary">
                     Tornar al SuperBuscador
-                </Link>
+                </button>
             </div>
         );
     }
@@ -157,9 +158,9 @@ export default function SuperContratoDetalle() {
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link to="/superbuscador" className="btn btn-secondary p-2">
+                <button onClick={() => navigate(-1)} className="btn btn-secondary p-2">
                     <ArrowLeft size={20} />
-                </Link>
+                </button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-slate-800">{contrato.codi_expedient}</h1>

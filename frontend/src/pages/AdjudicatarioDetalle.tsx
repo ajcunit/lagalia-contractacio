@@ -97,7 +97,7 @@ export default function AdjudicatarioDetalle() {
             <div className="flex h-full flex-col items-center justify-center text-slate-500">
                 <Building2 size={48} className="mb-4 text-slate-300" />
                 <h2 className="text-xl font-bold text-slate-700">Adjudicatari no trobat</h2>
-                <Link to="/adjudicatarios" className="mt-4 text-primary-600 hover:text-primary-700 font-medium">Torna al directori</Link>
+                <button onClick={() => navigate(-1)} className="mt-4 text-primary-600 hover:text-primary-700 font-medium">Torna al directori</button>
             </div>
         );
     }
@@ -106,9 +106,9 @@ export default function AdjudicatarioDetalle() {
         <div className="space-y-6 w-full flex flex-col h-full">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link to="/adjudicatarios" className="btn btn-circle btn-ghost bg-white shadow-sm border border-slate-200">
+                <button onClick={() => navigate(-1)} className="btn btn-circle btn-ghost bg-white shadow-sm border border-slate-200">
                     <ArrowLeft size={20} />
-                </Link>
+                </button>
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                         {adjudicatario.nombre}

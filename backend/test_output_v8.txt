@@ -1,0 +1,78 @@
+﻿
+=================================================================
+[1/5] Contracte: 9792/2022
+  Objecte : Patrocini Sara B Beach Volleyball Pro Tour
+  Tipus   : Serveis
+  CPV BD  : 98390000-3 -- ?
+  CPV exist: SI
+  Netejat : Sara B Beach Volleyball Pro Tour
+  Tipus IA: servei
+  Kw IA   : ['beisbol', 'professional', 'torneig', 'europeu'] | Divs: ['82', '79']
+  [KO] CPV ESPERAT NO TROBAT en 20 candidats
+     Candidat: 37451130-4 -- Bats de beisbol
+     Candidat: 37451120-1 -- Bases de beisbol
+     Candidat: 45214310-6 -- Treballs de construcci├│ de centres de formaci├│ pro
+     Candidat: 76200000-5 -- Serveis professionals per a la ind├║stria del petro
+     Candidat: 33641000-5 -- Medicaments per al sistema genitourinari i hormone
+
+=================================================================
+[2/5] Contracte: 782/2025
+  Objecte : Contracte administratiu pel subministrament de lÔÇÖequipament de mobiliari dels espais interiors i zon...
+  Tipus   : Subministraments
+  CPV BD  : 39161000-8 -- ?
+  CPV exist: SI
+  Netejat : Contracte administratiu pel subministrament de lÔÇÖequipament de mobiliari dels es...
+  Tipus IA: subministrament
+  Kw IA   : ['mobiliari', 'equipament', 'interiors', 'exteriors', 'escola', 'bressol'] | Divs: ['39', '90']
+  [KO] CPV ESPERAT NO TROBAT en 64 candidats
+     Candidat: 33192350-0 -- Mobiliari de cultius amb finalitats m├¿diques
+     Candidat: 39292000-5 -- Pissarres o taulers escolars amb superf├¡cies o est
+     Candidat: 75123000-4 -- Serveis administratius d'habitatge
+     Candidat: 45316100-6 -- Instal┬Àlaci├│ d'aparells d'enllumenat exterior
+     Candidat: 70330000-3 -- Serveis d'administraci├│ de b├®ns immobles per honor
+
+=================================================================
+[3/5] Contracte: 1475/2024
+  Objecte : subministrament de material dÔÇÖoficina, paper i altres productes personalitzats per lÔÇÖAjuntament de C...
+  Tipus   : Subministraments
+  CPV BD  : 30197000-6 -- ?
+  CPV exist: SI
+  Netejat : material dÔÇÖoficina, paper i altres productes personalitzats per lÔÇÖAjuntament de ...
+  Tipus IA: subministrament
+  Kw IA   : ['material', 'oficina', 'paper', 'personalitzat'] | Divs: ['08', '14']
+  [OK] CPV ESPERAT TROBAT entre 52 candidats
+
+=================================================================
+[4/5] Contracte: 8615/2023
+  Objecte : Concessi├│ de la gesti├│ i explotaci├│ del servei de Bar-Cafeteria i Zona Pic-nic, i dels serveis de ne...
+  Tipus   : Concessi├│ de serveis
+  CPV BD  : 90910000-9 -- ?
+  CPV exist: SI
+  Netejat : gesti├│ i explotaci├│ del servei de Bar-Cafeteria i Zona Pic-nic, i dels serveis d...
+  Tipus IA: servei
+  Kw IA   : ['neteja', 'vigil├áncia', 'cafeteria'] | Divs: ['90', '81']
+  [KO] CPV ESPERAT NO TROBAT en 42 candidats
+     Candidat: 30237250-6 -- Accessoris de neteja d'ordinadors
+     Candidat: 51541000-6 -- Serveis d'instal┬Àlaci├│ de maquin├ária de mineria, d
+     Candidat: 34968000-0 -- Sistema de vigil├áncia aeroportu├ária i sistema d'il
+     Candidat: 30237251-3 -- Paquets de neteja d'ordinadors
+     Candidat: 48161000-4 -- Sistema de gesti├│ de biblioteques
+
+=================================================================
+[5/5] Contracte: 1584/2024
+  Objecte : 1.4.6. Contracte menor de 10.000 o m├®s - Subministrament de gegants
+  Tipus   : Subministraments
+  CPV BD  : 37510000-6 -- ?
+  CPV exist: SI
+  Netejat : 1.4.6. Contracte menor de 10.000 o m├®s - Subministrament de gegants
+  Tipus IA: subministrament
+  Kw IA   : ['gegants'] | Divs: ['38', '90']
+  [KO] CPV ESPERAT NO TROBAT en 13 candidats
+     Candidat: 31154000-0 -- Subministraments ininterrompibles d'energia
+     Candidat: 70330000-3 -- Serveis d'administraci├│ de b├®ns immobles per honor
+     Candidat: 34946000-0 -- Materials i subministraments de construcci├│ de vie
+     Candidat: 34946200-2 -- Subministraments de construcci├│ de vies f├¿rries
+     Candidat: 79994000-8 -- Serveis d'administraci├│ de contractes
+
+=================================================================
+RESULTAT: 1/5 CPVs esperats en candidats textuals (20%)

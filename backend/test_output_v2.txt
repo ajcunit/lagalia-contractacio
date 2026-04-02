@@ -1,0 +1,58 @@
+﻿
+=================================================================
+[1/5] Contracte: 7349/2024
+  Objecte : Contractaci├│ per la redacci├│ del projecte d'obres de renovaci├│ de xarxa d'aigua potable al municipi ...
+  Tipus   : Serveis
+  CPV BD  : 71242000-6 -- ?
+  CPV exist: SI
+  Netejat : Contractaci├│ per la redacci├│ del projecte d'obres de renovaci├│ de xarxa d'aigua ...
+  Tipus IA: servei
+  Kw IA   : []
+  [KO] CPV ESPERAT NO TROBAT en 0 candidats
+
+=================================================================
+[2/5] Contracte: 9065/2023-9456/2023
+  Objecte : Representaci├│ i defensa de lÔÇÖAjuntament de Cunit en aquest recurs ordinari n├║m. 327/2023/E plantejat...
+  Tipus   : Serveis
+  CPV BD  : 79110000-8 -- ?
+  CPV exist: SI
+  Netejat : Representaci├│ i defensa de lÔÇÖAjuntament de Cunit en aquest recurs ordinari n├║m. ...
+  Tipus IA: subministrament
+  Kw IA   : []
+  [KO] CPV ESPERAT NO TROBAT en 0 candidats
+
+=================================================================
+[3/5] Contracte: 8289/2024
+  Objecte : Servei de recollida de trucades dÔÇÖatenci├│ al ciutad├á fent el despatx corresponent de la trucada o b├®...
+  Tipus   : Serveis
+  CPV BD  : 79510000-2 -- ?
+  CPV exist: SI
+  Netejat : recollida de trucades dÔÇÖatenci├│ al ciutad├á fent el despatx corresponent de la tr...
+  Tipus IA: servei
+  Kw IA   : []
+  [KO] CPV ESPERAT NO TROBAT en 0 candidats
+
+=================================================================
+[4/5] Contracte: 9145/2025
+  Objecte : Contractaci├│ dels serveis art├¡stics per la realitzaci├│ dels concerts en la Festa Major dÔÇÖhivern de C...
+  Tipus   : Serveis
+  CPV BD  : 92312000-1 -- ?
+  CPV exist: SI
+  Netejat : ls serveis art├¡stics per la realitzaci├│ dels concerts en la Festa Major dÔÇÖhivern...
+  Tipus IA: servei
+  Kw IA   : []
+  [KO] CPV ESPERAT NO TROBAT en 0 candidats
+
+=================================================================
+[5/5] Contracte: 7414/2023
+  Objecte : Prestaci├│ serveis per cobrir les necessitats espec├¡fiques dels sistemes de xarxa: electr├▓nica, wifi ...
+  Tipus   : Serveis
+  CPV BD  : 72267000-4 -- ?
+  CPV exist: SI
+  Netejat : Prestaci├│ serveis per cobrir les necessitats espec├¡fiques dels sistemes de xarxa...
+  Tipus IA: servei
+  Kw IA   : []
+  [KO] CPV ESPERAT NO TROBAT en 0 candidats
+
+=================================================================
+RESULTAT: 0/5 CPVs esperats en candidats textuals (0%)

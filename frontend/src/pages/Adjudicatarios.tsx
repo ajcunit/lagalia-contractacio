@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api, Adjudicatario } from '../api/client';
-import { Search, ArrowUpDown, Building2, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, Building2, TrendingUp, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 
 export default function Adjudicatarios() {
+    const [urlParams, setUrlParams] = useSearchParams();
     const navigate = useNavigate();
     const [adjudicatarios, setAdjudicatarios] = useState<Adjudicatario[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
     const [total, setTotal] = useState(0);
-    const [page, setPage] = useState(0);
-    const [showFilters, setShowFilters] = useState(false);
-    const limit = 50;
+    const [showFilters, setShowFilters] = useState(!!(urlParams.get('search') || urlParams.get('sort_by')));
 
-    const [sortBy, setSortBy] = useState('total_importe');
-    const [sortDesc, setSortDesc] = useState(true);
+    // LOCAL TEXT STATE (for smooth typing)
+    const [localSearch, setLocalSearch] = useState(urlParams.get('search') || '');
+
+    // DERIVED STATE FROM URL
+    const search = urlParams.get('search') || '';
+    const page = Number(urlParams.get('page')) || 0;
+    const sortBy = urlParams.get('sort_by') || 'total_importe';
+    const sortDesc = urlParams.get('sort_desc') !== 'false';
+    const limit = 50;
 
     const loadData = async () => {
         setLoading(true);
@@ -35,138 +40,162 @@ export default function Adjudicatarios() {
         }
     };
 
+    // Main data fetching effect: depends only on URL
     useEffect(() => {
+        setLocalSearch(urlParams.get('search') || '');
         const timeout = setTimeout(() => {
             loadData();
         }, 300);
         return () => clearTimeout(timeout);
-    }, [search, page, sortBy, sortDesc]);
+    }, [urlParams]); 
+
+    const updateURL = (newFilters: any) => {
+        const nextParams = Object.fromEntries(urlParams.entries());
+        const resetPage = !('page' in newFilters);
+        
+        const merged = { ...nextParams, ...newFilters };
+        if (resetPage) merged.page = '0';
+        
+        const cleanParams = Object.fromEntries(
+            Object.entries(merged).filter(([_, v]) => v !== '' && v !== false && v !== undefined && v !== null && v !== 'total_importe')
+        );
+        setUrlParams(cleanParams as any);
+    };
 
     const handleSort = (column: string) => {
         if (sortBy === column) {
-            setSortDesc(!sortDesc);
+            updateURL({ sort_desc: !sortDesc });
         } else {
-            setSortBy(column);
-            setSortDesc(true);
+            updateURL({ sort_by: column, sort_desc: true });
         }
-        setPage(0);
     };
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('ca-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+        return new Intl.NumberFormat('ca-ES', {
+            style: 'currency',
+            currency: 'EUR',
+            minimumFractionDigits: 0,
+        }).format(amount);
     };
 
     return (
         <div className="space-y-6 w-full h-full flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <Building2 className="text-primary-500" />
-                        Adjudicataris
+                        <Building2 className="text-primary-600" />
+                        Directori d'Adjudicataris
                     </h1>
-                    <p className="text-slate-500 mt-1">Directori d'empreses amb contractes adjudicats</p>
+                    <p className="text-sm text-slate-500">Anàlisi d'empreses i volum de contractació</p>
                 </div>
-            </div>
-
-            <div className="glass-card p-4">
-                <div className="flex gap-4">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Cercar empresa per nom..."
-                            className="input input-search"
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value);
-                                setPage(0);
-                            }}
-                        />
-                    </div>
-                    <button
-                        type="button"
-                        className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'} gap-2`}
+                <div className="flex items-center gap-3">
+                     <button 
                         onClick={() => setShowFilters(!showFilters)}
+                        className={`btn-secondary h-10 px-4 flex items-center gap-2 font-bold outline-none ${showFilters ? 'bg-slate-100 text-slate-900 border-slate-300' : ''}`}
                     >
                         <Filter size={18} />
                         Filtres
                     </button>
                 </div>
-                
-                {showFilters && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100 mt-4">
-                         <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 italic">
-                            Aviat podràs filtrar per municipi o activitat econòmica.
-                         </div>
-                    </div>
-                )}
             </div>
 
-            <div className="glass-card flex-1 flex flex-col overflow-hidden">
+            {/* Quick Stats Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+                <div className="glass-card p-4 border-l-4 border-l-primary-500 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600">
+                        <Building2 size={24} />
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Empreses</div>
+                        <div className="text-xl font-bold text-slate-800 tabular-nums">{total}</div>
+                    </div>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-l-emerald-500 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <TrendingUp size={24} />
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Major Contractista</div>
+                        <div className="text-sm font-bold text-slate-800 line-clamp-1">{adjudicatarios[0]?.nombre || '-'}</div>
+                    </div>
+                </div>
+            </div>
+
+            {showFilters && (
+                <div className="glass-card p-4 bg-slate-50/50 border-slate-200 animate-in fade-in slide-in-from-top-2 duration-200 shrink-0">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex-1 min-w-[300px] flex items-center gap-3 px-4 h-11 bg-white rounded-xl border border-slate-200 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-500/5 transition-all">
+                            <Search className="text-slate-400" size={18} />
+                            <input 
+                                type="text"
+                                placeholder="Cerca per CIF o Nom de l'empresa..."
+                                className="bg-transparent border-none focus:ring-0 w-full text-sm font-medium outline-none"
+                                value={localSearch}
+                                onChange={(e) => setLocalSearch(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && updateURL({ search: localSearch })}
+                                onBlur={() => updateURL({ search: localSearch })}
+                            />
+                        </div>
+                        <button 
+                            onClick={() => { setLocalSearch(''); updateURL({ search: '', page: 0 }); }}
+                            className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider outline-none"
+                        >
+                            Netejar
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="glass-card flex-1 flex flex-col overflow-hidden min-h-0 bg-white">
                 <div className="flex-1 overflow-auto">
                     {loading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="loading-spinner w-10 h-10"></div>
-                        </div>
-                    ) : adjudicatarios.length === 0 ? (
-                        <div className="text-center py-12">
-                            <p className="text-slate-500">No s'han trobat empreses</p>
-                        </div>
+                        <div className="flex items-center justify-center h-64"><div className="loading-spinner"></div></div>
                     ) : (
                         <table className="table border-collapse w-full">
-                            <thead className="bg-slate-50 sticky top-0 z-10">
+                            <thead className="bg-slate-50/80 backdrop-blur sticky top-0 z-10 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-6 py-4 text-left">
-                                        <div className="flex items-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
-                                            CIF/NIF
-                                        </div>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Adjudicatari</th>
+                                    <th 
+                                        className="px-6 py-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-primary-600 transition-colors"
+                                        onClick={() => handleSort('total_contratos')}
+                                    >
+                                        Num. Contractes {sortBy === 'total_contratos' && (sortDesc ? '↓' : '↑')}
                                     </th>
-                                    <th onClick={() => handleSort('nombre')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-left">
-                                        <div className="flex items-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
-                                            Nom de l'Empresa
-                                            {sortBy === 'nombre' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
-                                        </div>
+                                    <th 
+                                        className="px-6 py-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-primary-600 transition-colors"
+                                        onClick={() => handleSort('total_importe')}
+                                    >
+                                        Import Total {sortBy === 'total_importe' && (sortDesc ? '↓' : '↑')}
                                     </th>
-                                    <th onClick={() => handleSort('total_contratos')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-center">
-                                        <div className="flex items-center justify-center gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
-                                            Nº Contractes
-                                            {sortBy === 'total_contratos' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
-                                        </div>
-                                    </th>
-                                    <th onClick={() => handleSort('total_importe')} className="cursor-pointer hover:bg-slate-100 transition-colors px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 uppercase text-[11px] font-bold tracking-wider text-slate-500">
-                                            Volum Adjudicat
-                                            {sortBy === 'total_importe' && <ArrowUpDown size={14} className={sortDesc ? 'text-primary-500 rotate-180' : 'text-primary-500'} />}
-                                        </div>
-                                    </th>
+                                    <th className="w-16 px-6 py-4"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {adjudicatarios.map((emp) => (
+                                {adjudicatarios.map((adj, idx) => (
                                     <tr 
-                                        key={emp.nombre} 
-                                        onClick={() => navigate(`/adjudicatarios/${btoa(encodeURIComponent(emp.nombre)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`)}
-                                        className="hover:bg-slate-50/80 cursor-pointer group"
+                                        key={idx} 
+                                        className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                                        onClick={() => {
+                                            const encodedName = btoa(encodeURIComponent(adj.nombre)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                                            navigate(`/adjudicatarios/${encodedName}`);
+                                        }}
                                     >
                                         <td className="px-6 py-4">
-                                            <span className="text-sm font-medium text-slate-600">
-                                                {emp.nif || '—'}
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-slate-700 text-sm">{adj.nombre}</span>
+                                                <span className="text-[10px] font-mono text-slate-400">{adj.nif}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right tabular-nums">
+                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold text-xs ring-4 ring-slate-50">
+                                                {adj.total_contratos}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="font-semibold text-slate-800 group-hover:text-primary-700 transition-colors">
-                                                {emp.nombre}
-                                            </span>
+                                        <td className="px-6 py-4 text-right tabular-nums">
+                                            <span className="font-bold text-slate-800">{formatCurrency(adj.total_importe)}</span>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-primary-50 text-primary-700 font-bold text-xs">
-                                                {emp.total_contratos}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="font-bold text-slate-800 number-display">
-                                                {formatCurrency(emp.total_importe)}
-                                            </span>
+                                        <td className="px-6 py-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <ChevronRight size={18} className="text-primary-400 inline-block" />
                                         </td>
                                     </tr>
                                 ))}
@@ -175,29 +204,28 @@ export default function Adjudicatarios() {
                     )}
                 </div>
 
-                {total > 0 && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/30">
-                        <p className="text-sm text-slate-500 font-medium">
-                            Mostrant <span className="text-slate-800">{page * limit + 1}</span> - <span className="text-slate-800">{Math.min((page + 1) * limit, total)}</span> de <span className="text-slate-800">{total}</span> adjudicataris
-                        </p>
-                        <div className="flex gap-2">
-                            <button 
-                                className="btn btn-secondary btn-sm" 
-                                disabled={page === 0}
-                                onClick={() => setPage(p => p - 1)}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <button 
-                                className="btn btn-secondary btn-sm" 
-                                disabled={(page + 1) * limit >= total}
-                                onClick={() => setPage(p => p + 1)}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+                    <div className="text-xs text-slate-400 font-medium tracking-tight">
+                        Pàgina {page + 1} de {Math.ceil(total / limit)}
                     </div>
-                )}
+                    <div className="flex items-center gap-1">
+                        <button 
+                            className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600 outline-none"
+                            onClick={() => updateURL({ page: Math.max(0, page - 1) })}
+                            disabled={page === 0}
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="text-[11px] font-bold px-2 text-slate-700 font-mono text-xs">PÀGINA {page + 1}</span>
+                        <button 
+                            className="p-1 px-3 rounded-lg hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors text-slate-600 outline-none"
+                            onClick={() => updateURL({ page: page + 1 })}
+                            disabled={(page + 1) * limit >= total}
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
