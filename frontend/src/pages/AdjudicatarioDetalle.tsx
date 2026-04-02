@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api, AdjudicatarioDetalleResponse, ContratoAdjudicatario } from '../api/client';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Building2, ArrowLeft, Calendar, FileText, Loader2, ScrollText, CreditCard, ArrowUpDown } from 'lucide-react';
 
 export default function AdjudicatarioDetalle() {

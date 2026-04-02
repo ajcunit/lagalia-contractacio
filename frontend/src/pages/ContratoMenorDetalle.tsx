@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api, ContratoMenor, Departamento, Empleado } from '../api/client';
 import { ArrowLeft, Building2, Calendar, FileText, CheckCircle2, Edit, Save, X, Layers } from 'lucide-react';
 
