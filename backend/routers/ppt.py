@@ -54,3 +54,73 @@ async def generate_ppt_section(
         return {"success": True, "content": content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class DraftSaveRequest(BaseModel):
+    titol: str
+    contrato_id: Optional[int] = None
+    contingut_json: str
+
+@router.get("/esborranys")
+def get_user_drafts(db: Session = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    from models import PPTEsborrany, Contrato
+    drafts = db.query(PPTEsborrany).filter(PPTEsborrany.empleado_id == current_user.id).order_by(PPTEsborrany.fecha_modificacion.desc()).all()
+    res = []
+    for d in drafts:
+        contract = db.query(Contrato).filter(Contrato.id == d.contrato_id).first() if d.contrato_id else None
+        res.append({
+            "id": d.id,
+            "titol": d.titol,
+            "contrato_id": d.contrato_id,
+            "expedient": contract.codi_expedient if contract else None,
+            "fecha_modificacion": d.fecha_modificacion,
+        })
+    return res
+
+@router.get("/esborranys/{draft_id}")
+def get_draft(draft_id: int, db: Session = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    from models import PPTEsborrany
+    draft = db.query(PPTEsborrany).filter(PPTEsborrany.id == draft_id, PPTEsborrany.empleado_id == current_user.id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Esborrany no trobat")
+    return {
+        "id": draft.id,
+        "titol": draft.titol,
+        "contrato_id": draft.contrato_id,
+        "contingut_json": draft.contingut_json
+    }
+
+@router.post("/esborranys")
+def create_draft(payload: DraftSaveRequest, db: Session = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    from models import PPTEsborrany
+    draft = PPTEsborrany(
+        empleado_id=current_user.id,
+        titol=payload.titol,
+        contrato_id=payload.contrato_id,
+        contingut_json=payload.contingut_json
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+    return {"id": draft.id, "titol": draft.titol}
+
+@router.put("/esborranys/{draft_id}")
+def update_draft(draft_id: int, payload: DraftSaveRequest, db: Session = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    from models import PPTEsborrany
+    draft = db.query(PPTEsborrany).filter(PPTEsborrany.id == draft_id, PPTEsborrany.empleado_id == current_user.id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Esborrany no trobat")
+    draft.titol = payload.titol
+    draft.contrato_id = payload.contrato_id
+    draft.contingut_json = payload.contingut_json
+    db.commit()
+    return {"id": draft.id, "titol": draft.titol}
+
+@router.delete("/esborranys/{draft_id}")
+def delete_draft(draft_id: int, db: Session = Depends(get_db), current_user: Any = Depends(get_current_user)):
+    from models import PPTEsborrany
+    draft = db.query(PPTEsborrany).filter(PPTEsborrany.id == draft_id, PPTEsborrany.empleado_id == current_user.id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Esborrany no trobat")
+    db.delete(draft)
+    db.commit()
+    return {"success": True}

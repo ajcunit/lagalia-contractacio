@@ -730,6 +730,32 @@ class ApiClient {
         }).then(res => res.content);
     }
 
+    async getPPTDrafts(): Promise<any[]> {
+        return this.request<any[]>('/ppt/esborranys');
+    }
+
+    async savePPTDraft(data: { titol: string, contrato_id?: number | null, contingut_json: string }): Promise<any> {
+        return this.request<any>('/ppt/esborranys', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async updatePPTDraft(id: number, data: { titol: string, contrato_id?: number | null, contingut_json: string }): Promise<any> {
+        return this.request<any>(`/ppt/esborranys/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+    }
+
+    async getPPTDraft(id: number): Promise<any> {
+        return this.request<any>(`/ppt/esborranys/${id}`);
+    }
+
+    async deletePPTDraft(id: number): Promise<any> {
+        return this.request<any>(`/ppt/esborranys/${id}`, { method: 'DELETE' });
+    }
+
     async getDuplicadosCount(): Promise<{ pendientes: number }> {
         return this.request<{ pendientes: number }>('/sincronizacion/duplicados/count');
     }

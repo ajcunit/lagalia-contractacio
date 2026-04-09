@@ -427,3 +427,18 @@ class AuditLog(Base):
     ip_address = Column(String(45))
     details = Column(Text)
     success = Column(String(10))
+
+class PPTEsborrany(Base):
+    """Esborranys de PPT/Informes associats a un usuari i opcionalment a un contracte."""
+    __tablename__ = "ppt_esborranys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    empleado_id = Column(Integer, ForeignKey("empleados.id", ondelete="CASCADE"), nullable=False)
+    titol = Column(String(255), nullable=False)
+    contrato_id = Column(Integer, ForeignKey("contratos.id", ondelete="CASCADE"), nullable=True)
+    contingut_json = Column(Text, nullable=False) # JSON array of {title, content, params}
+    fecha_creacion = Column(DateTime, server_default=func.now())
+    fecha_modificacion = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    empleado = relationship("Empleado")
+    contrato = relationship("Contrato")
