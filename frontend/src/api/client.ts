@@ -280,46 +280,146 @@ export interface AdjudicatarioDetalleResponse {
     contratos: ContratoAdjudicatario[];
 }
 
+// ===== Token Management =====
+
+export function getTokens(): { access: string | null; refresh: string | null } {
+    return {
+        access: localStorage.getItem('access_token'),
+        refresh: localStorage.getItem('refresh_token'),
+    };
+}
+
+function setTokens(tokens: { access_token: string; refresh_token: string }) {
+    localStorage.setItem('access_token', tokens.access_token);
+    localStorage.setItem('refresh_token', tokens.refresh_token);
+}
+
+export function clearTokens() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    // Backward compat: also clear old 'token' key
+    localStorage.removeItem('token');
+}
+
 // API Client
 class ApiClient {
     private baseUrl: string;
+    private isRefreshing = false;
+    private refreshQueue: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = [];
 
     constructor(baseUrl: string) {
         this.baseUrl = baseUrl;
     }
 
-    public async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-        const token = localStorage.getItem('token');
+    private async _fetch(endpoint: string, options?: RequestInit): Promise<Response> {
+        const { access } = getTokens();
         const viewMode = localStorage.getItem('viewMode') || 'user';
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             'X-View-Mode': viewMode,
             ...(options?.headers as any),
         };
-        
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        if (access) {
+            headers['Authorization'] = `Bearer ${access}`;
+        }
+        return fetch(`${this.baseUrl}${endpoint}`, { ...options, headers });
+    }
+
+    private async _refreshToken(): Promise<string | null> {
+        const { refresh } = getTokens();
+        if (!refresh) return null;
+
+        if (this.isRefreshing) {
+            return new Promise((resolve, reject) => {
+                this.refreshQueue.push({ resolve, reject });
+            });
         }
 
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            ...options,
-            headers,
-        });
+        this.isRefreshing = true;
+        try {
+            const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refresh }),
+            });
+
+            if (!response.ok) {
+                this.refreshQueue.forEach(q => q.reject('Refresh failed'));
+                this.refreshQueue = [];
+                return null;
+            }
+
+            const tokens = await response.json();
+            setTokens(tokens);
+            this.refreshQueue.forEach(q => q.resolve(tokens.access_token));
+            this.refreshQueue = [];
+            return tokens.access_token;
+        } catch {
+            this.refreshQueue.forEach(q => q.reject('Refresh failed'));
+            this.refreshQueue = [];
+            return null;
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    private _handleLogout() {
+        clearTokens();
+        window.dispatchEvent(new Event('unauthorized'));
+    }
+
+    public async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+        const response = await this._fetch(endpoint, options);
+
+        if (response.status === 401) {
+            // Try refresh
+            const newAccess = await this._refreshToken();
+            if (newAccess) {
+                const retryResponse = await this._fetch(endpoint, options);
+                if (!retryResponse.ok) {
+                    if (retryResponse.status === 401) this._handleLogout();
+                    const error = await retryResponse.json().catch(() => ({}));
+                    throw new Error(error.detail || `Error HTTP: ${retryResponse.status}`);
+                }
+                return retryResponse.json();
+            } else {
+                this._handleLogout();
+                throw new Error('Sessió expirada');
+            }
+        }
 
         if (!response.ok) {
-            if (response.status === 401) {
-                localStorage.removeItem('token');
-                window.dispatchEvent(new Event('unauthorized'));
-            }
             const error = await response.json().catch(() => ({}));
             throw new Error(error.detail || `Error HTTP: ${response.status}`);
         }
-
         return response.json();
     }
 
-    // Auth
-    async login(username: string, password: string): Promise<{ access_token: string }> {
+    // ===== Setup =====
+    async getSetupStatus(): Promise<{ needs_setup: boolean }> {
+        const res = await fetch(`${this.baseUrl}/setup/status`);
+        return res.json();
+    }
+
+    async initializeSetup(data: {
+        admin_name: string; admin_email: string;
+        admin_password: string; admin_password_confirm: string;
+        organization_name?: string; ine10_code?: string;
+    }) {
+        const res = await fetch(`${this.baseUrl}/setup/initialize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Error en la configuració');
+        }
+        return res.json();
+    }
+
+    // ===== Auth =====
+    async login(username: string, password: string): Promise<{ access_token: string; refresh_token: string }> {
         const formData = new URLSearchParams();
         formData.append('username', username);
         formData.append('password', password);
@@ -333,9 +433,25 @@ class ApiClient {
         });
         
         if (!response.ok) {
-            throw new Error('Correu o contrasenya incorrectes');
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Correu o contrasenya incorrectes');
         }
-        return response.json();
+        const tokens = await response.json();
+        setTokens(tokens);
+        return tokens;
+    }
+
+    async logout(): Promise<void> {
+        const { refresh } = getTokens();
+        if (refresh) {
+            try {
+                await this.request('/auth/logout', {
+                    method: 'POST',
+                    body: JSON.stringify({ refresh_token: refresh }),
+                });
+            } catch { /* ignore logout failures */ }
+        }
+        clearTokens();
     }
 
     async getMe(): Promise<Empleado> {
@@ -556,8 +672,8 @@ class ApiClient {
         onError: (err: any) => void,
         onComplete: () => void
     ): EventSource {
-        const token = localStorage.getItem('token');
-        const source = new EventSource(`${this.baseUrl}/sincronizacion/ejecutar/stream?codi_ine10=${codi_ine10}&token=${encodeURIComponent(token || '')}`);
+        const { access } = getTokens();
+        const source = new EventSource(`${this.baseUrl}/sincronizacion/ejecutar/stream?codi_ine10=${codi_ine10}&token=${encodeURIComponent(access || '')}`);
         
         source.onmessage = (event) => {
             try {

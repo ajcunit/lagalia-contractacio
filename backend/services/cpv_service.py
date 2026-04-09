@@ -88,7 +88,7 @@ class CPVService:
 
 async def get_cpv_descriptions(codes: list) -> Dict[str, str]:
     """Obte les descripcions d'una llista de codis CPV de la base de dades"""
-    from database import SessionLocal
+    from core.database import SessionLocal
     import models
     
     db = SessionLocal()

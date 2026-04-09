@@ -1,6 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from database import SessionLocal
+from core.database import SessionLocal
 import models
 from services.sync_service import SyncService
 import traceback

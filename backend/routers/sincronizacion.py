@@ -4,11 +4,13 @@ from sqlalchemy.orm import Session
 import json
 from typing import List, Optional
 from datetime import datetime
-from database import get_db
+from core.database import get_db
 import models
 import schemas
 from services.sync_service import SyncService
-from services.auth_service import get_current_user, SECRET_KEY, ALGORITHM
+from services.auth_service import get_current_user
+from core.config import settings
+from core.security import decode_access_token
 
 router = APIRouter(prefix="/sincronizacion", tags=["sincronizacion"])
 # Separate router for SSE endpoints that handle auth manually (EventSource can't send headers)
@@ -40,9 +42,8 @@ def ejecutar_sincronizacion_stream(
     db: Session = Depends(get_db),
 ):
     # EventSource (SSE) cannot send Authorization headers, so we accept the token via query param
-    from jose import jwt, JWTError
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = decode_access_token(token)
         email: str = payload.get("sub")
         if email is None:
             return StreamingResponse(
@@ -133,7 +134,7 @@ def ejecutar_sincronizacion(
     SyncService.run_sync(sync_id, codi_ine10)
     
     # Also sync prorrogues (need to re-open or use SessionLocal as run_sync closed its session)
-    from database import SessionLocal as db_local
+    from core.database import SessionLocal as db_local
     db_p = db_local()
     prorrogues_stats = SyncService.sync_prorrogues(db_p, codi_ine10)
     db_p.close()

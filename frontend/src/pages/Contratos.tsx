@@ -176,7 +176,7 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
         setUrlParams({ tab: 'ordinarios' });
     };
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async () => {
         const params = new URLSearchParams();
         params.append('busqueda', searchState.busqueda);
         if (searchState.estat_actual) params.append('estat_actual', searchState.estat_actual);
@@ -193,8 +193,8 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
             params.append('fecha_inicio_desde', `${year}-01-01`);
             params.append('fecha_inicio_hasta', `${year}-12-31`);
         }
-        const token = localStorage.getItem('token');
-        if (token) params.append('token', token);
+        const { access } = (await import('../api/client')).getTokens();
+        if (access) params.append('token', access);
         window.open(`/api/contratos/export/csv?${params.toString()}`, '_blank');
     };
 

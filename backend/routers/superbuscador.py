@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, Depends, HTTPException
 import httpx
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from database import get_db
+from core.database import get_db
 import models
 from services.sync_service import SyncService
 

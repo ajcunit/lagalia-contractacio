@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from core.database import Base
 
 
 class Departamento(Base):
@@ -400,3 +400,30 @@ class AliasAdjudicatario(Base):
     nombre_original = Column(String(255), unique=True, nullable=False, index=True)
     nombre_canonico = Column(String(255), nullable=False)
     fecha_creacion = Column(DateTime, server_default=func.now())
+
+
+class RefreshToken(Base):
+    """Refresh tokens per renovar access tokens JWT de forma segura."""
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token_hash = Column(String(128), unique=True, nullable=False, index=True)
+    empleado_id = Column(Integer, ForeignKey("empleados.id", ondelete="CASCADE"), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    revoked = Column(Boolean, default=False)
+
+    empleado = relationship("Empleado", backref="refresh_tokens")
+
+
+class AuditLog(Base):
+    """Log d'auditoria de seguretat: logins, canvis de configuració, accions admin."""
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, server_default=func.now(), index=True)
+    action = Column(String(100), nullable=False, index=True)
+    user_email = Column(String(255), index=True)
+    ip_address = Column(String(45))
+    details = Column(Text)
+    success = Column(String(10))

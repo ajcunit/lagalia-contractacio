@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from database import SessionLocal
+from core.database import SessionLocal
 import models
 
 logger = logging.getLogger(__name__)

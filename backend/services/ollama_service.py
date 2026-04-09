@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional, Tuple
 import models
 
+from core.config import settings
+from services.external_api_client import ExternalAPIClient
+
 logger = logging.getLogger(__name__)
 
 class OllamaService:
@@ -129,42 +132,38 @@ Codis: 00000000, 00000000..."""
             payload["think"] = think_val
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{config['url']}/api/generate",
-                    json=payload,
-                    timeout=45.0
-                )
-                response.raise_for_status()
-                raw_text = response.json().get("response", "")
-                content = OllamaService.clean_text_response(raw_text)
-                
-                import re
-                # Extraure paraules
-                words_match = re.search(r'paraules:\s*(.*)', content, re.IGNORECASE)
-                words_str = words_match.group(1) if words_match else content
-                all_words = re.findall(r'[a-zàèòéíóúüç\d]{4,}', words_str.lower())
-                
-                # Extraure divisions
-                divs_match = re.search(r'divisions:\s*(.*)', content, re.IGNORECASE)
-                divs_str = divs_match.group(1) if divs_match else ""
-                divisions = re.findall(r'\b\d{2}\b', divs_str)
-                
-                # Extraure codis suggerits
-                codes_match = re.search(r'codis:\s*(.*)', content, re.IGNORECASE)
-                codes_str = codes_match.group(1) if codes_match else ""
-                suggested_codes = re.findall(r'\b\d{8}\b', codes_str)
-                
-                stopwords = {
-                    'aquest', 'aquesta', 'aquestes', 'aquells', 'aquelles', 'perquè', 'com', 'quan', 'on',
-                    'molt', 'poc', 'més', 'menys', 'estat', 'estan', 'sigui', 'seria', 'tenen', 'tenia',
-                    'sobre', 'entre', 'sota', 'fent', 'cada', 'segle', 'any', 'mes', 'dia', 'hores',
-                    'contracte', 'servei', 'serveis', 'subministrament', 'obra', 'obres', 'menor', 'major',
-                    'licitació', 'adjudicació', 'expedient', 'objecte', 'paraules'
-                }
-                
-                keywords = [w for w in all_words if w not in stopwords and not re.search(r'\d', w)]
-                return list(dict.fromkeys(keywords))[:10], list(dict.fromkeys(divisions))[:3], list(dict.fromkeys(suggested_codes))[:5]
+            data = await ExternalAPIClient.fetch_ollama(
+                config['url'], 'api/generate', payload
+            )
+            raw_text = data.get("response", "")
+            content = OllamaService.clean_text_response(raw_text)
+            
+            import re
+            # Extraure paraules
+            words_match = re.search(r'paraules:\s*(.*)', content, re.IGNORECASE)
+            words_str = words_match.group(1) if words_match else content
+            all_words = re.findall(r'[a-zàèòéíóúüç\d]{4,}', words_str.lower())
+            
+            # Extraure divisions
+            divs_match = re.search(r'divisions:\s*(.*)', content, re.IGNORECASE)
+            divs_str = divs_match.group(1) if divs_match else ""
+            divisions = re.findall(r'\b\d{2}\b', divs_str)
+            
+            # Extraure codis suggerits
+            codes_match = re.search(r'codis:\s*(.*)', content, re.IGNORECASE)
+            codes_str = codes_match.group(1) if codes_match else ""
+            suggested_codes = re.findall(r'\b\d{8}\b', codes_str)
+            
+            stopwords = {
+                'aquest', 'aquesta', 'aquestes', 'aquells', 'aquelles', 'perquè', 'com', 'quan', 'on',
+                'molt', 'poc', 'més', 'menys', 'estat', 'estan', 'sigui', 'seria', 'tenen', 'tenia',
+                'sobre', 'entre', 'sota', 'fent', 'cada', 'segle', 'any', 'mes', 'dia', 'hores',
+                'contracte', 'servei', 'serveis', 'subministrament', 'obra', 'obres', 'menor', 'major',
+                'licitació', 'adjudicació', 'expedient', 'objecte', 'paraules'
+            }
+            
+            keywords = [w for w in all_words if w not in stopwords and not re.search(r'\d', w)]
+            return list(dict.fromkeys(keywords))[:10], list(dict.fromkeys(divisions))[:3], list(dict.fromkeys(suggested_codes))[:5]
         except Exception:
             return [], [], []
 
@@ -209,21 +208,21 @@ Return a valid JSON array of objects with 'codigo', 'descripcion', 'score' (0.0-
         if think_val is not None: payload["think"] = think_val
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(f"{config['url']}/api/generate", json=payload, timeout=60.0)
-                response.raise_for_status()
-                raw_text = response.json().get("response", "")
-                results = json.loads(OllamaService.clean_text_response(raw_text))
-                
-                if isinstance(results, dict) and "suggestions" in results:
-                    results = results["suggestions"]
-                
-                # Millorar descripcions
-                code_map = {c.codigo: c.descripcion for c in candidates}
-                for res in results[:5]:
-                    if res.get('codigo') in code_map:
-                        res['descripcion'] = code_map[res['codigo']]
-                return results[:5]
+            data = await ExternalAPIClient.fetch_ollama(
+                config['url'], 'api/generate', payload
+            )
+            raw_text = data.get("response", "")
+            results = json.loads(OllamaService.clean_text_response(raw_text))
+            
+            if isinstance(results, dict) and "suggestions" in results:
+                results = results["suggestions"]
+            
+            # Millorar descripcions
+            code_map = {c.codigo: c.descripcion for c in candidates}
+            for res in results[:5]:
+                if res.get('codigo') in code_map:
+                    res['descripcion'] = code_map[res['codigo']]
+            return results[:5]
         except Exception as e:
             logger.error(f"Error ranking candidates with Ollama: {str(e)}")
             return [{"codigo": c.codigo, "descripcion": c.descripcion, "score": 0.5, "justificacion": "Error IA"} for c in candidates[:3]]
@@ -253,15 +252,11 @@ Utilitza format Markdown."""
         if think_val is not None: payload["think"] = think_val
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{config['url']}/api/generate",
-                    json=payload,
-                    timeout=120.0
-                )
-                response.raise_for_status()
-                content = response.json().get("response", "")
-                return OllamaService.clean_text_response(content)
+            data = await ExternalAPIClient.fetch_ollama(
+                config['url'], 'api/generate', payload
+            )
+            content = data.get("response", "")
+            return OllamaService.clean_text_response(content)
         except Exception as e:
             return f"Error connectant amb IA: {str(e)}"
 
@@ -483,10 +478,12 @@ Utilitza format Markdown."""
             return await GeminiService.rank_candidates(db, description, top_results)
         
         return await OllamaService.rank_candidates(db, description, top_results)
+
     @staticmethod
     async def get_available_models(db: Session) -> List[str]:
         config = OllamaService.get_config(db)
         try:
+            # GET endpoint - use httpx directly (fetch_ollama is POST-only)
             async with httpx.AsyncClient() as client:
                 response = await client.get(f"{config['url']}/api/tags", timeout=10.0)
                 response.raise_for_status()
@@ -502,3 +499,4 @@ Utilitza format Markdown."""
         except Exception as e:
             logger.error(f"Error fetching Ollama models: {e}")
             return []
+

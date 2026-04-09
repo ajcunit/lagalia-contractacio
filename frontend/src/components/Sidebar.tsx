@@ -48,8 +48,8 @@ export default function Sidebar() {
         api.getMe().then(setUser).catch(() => {});
     }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
+    const handleLogout = async () => {
+        await api.logout();
         window.location.href = '/login';
     };
 

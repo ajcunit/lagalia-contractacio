@@ -1,4 +1,3 @@
-import httpx
 import json
 import logging
 from sqlalchemy.orm import Session
@@ -6,16 +5,28 @@ from typing import List, Dict, Any, Optional, Tuple
 import models
 import re
 
+from core.config import settings
+from services.external_api_client import ExternalAPIClient
+
 logger = logging.getLogger(__name__)
 
 class GeminiService:
     @staticmethod
     def get_config(db: Session) -> Dict[str, str]:
-        api_key_cfg = db.query(models.Configuracion).filter(models.Configuracion.clave == "gemini_api_key").first()
-        model_cfg = db.query(models.Configuracion).filter(models.Configuracion.clave == "gemini_model").first()
+        # Prioritat: env var > BDD
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            api_key_cfg = db.query(models.Configuracion).filter(
+                models.Configuracion.clave == "gemini_api_key"
+            ).first()
+            api_key = api_key_cfg.valor if api_key_cfg else ""
+
+        model_cfg = db.query(models.Configuracion).filter(
+            models.Configuracion.clave == "gemini_model"
+        ).first()
         
         return {
-            "api_key": api_key_cfg.valor if api_key_cfg else "",
+            "api_key": api_key,
             "model": model_cfg.valor if model_cfg and model_cfg.valor else "gemini-1.5-flash"
         }
 
@@ -26,8 +37,7 @@ class GeminiService:
             logger.error("Gemini API Key missing in configuration")
             return ""
 
-        url = f"https://generativelanguage.googleapis.com/v1/models/{config['model']}:generateContent?key={config['api_key']}"
-        
+        # API key al HEADER (no a la URL) + rate limit extern
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]
@@ -41,21 +51,20 @@ class GeminiService:
         }
 
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, timeout=30.0)
-                response.raise_for_status()
-                data = response.json()
-                
-                if "candidates" in data and len(data["candidates"]) > 0:
-                    text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    logger.info(f"Gemini raw response: {text[:200]}...")
-                    return text
-                logger.warning(f"No candidates in Gemini response: {data}")
-                return ""
+            data = await ExternalAPIClient.fetch_gemini(
+                model=config["model"],
+                api_key=config["api_key"],
+                payload=payload,
+            )
+            
+            if "candidates" in data and len(data["candidates"]) > 0:
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                logger.info(f"Gemini raw response: {text[:200]}...")
+                return text
+            logger.warning(f"No candidates in Gemini response")
+            return ""
         except Exception as e:
             logger.error(f"Error calling Gemini API: {str(e)}")
-            if 'response' in locals() and hasattr(response, 'text'):
-                logger.error(f"Response body: {response.text}")
             return ""
 
     @staticmethod

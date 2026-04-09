@@ -32,8 +32,8 @@ export default function ConfiguracionPage() {
         'ollama_model_cpv': '',
         'ollama_model_auditoria': '',
         'ollama_think': 'smart',
-        'ia_enabled': 'true',
-        'ai_provider': 'ollama',
+        'ia_enabled': 'false',
+        'ai_provider': 'disabled',
         'gemini_api_key': '',
         'gemini_model': 'gemini-1.5-flash',
         'prompt_cpv_extract': '',
@@ -73,9 +73,9 @@ export default function ConfiguracionPage() {
                 } catch (err) {
                     // Fallback defaults
                     if (key === 'ine10_code') newConfigs[key] = '4305160009';
-                    else if (key === 'ai_provider') newConfigs[key] = 'ollama';
+                    else if (key === 'ai_provider') newConfigs[key] = 'disabled';
                     else if (key === 'gemini_model') newConfigs[key] = 'gemini-1.5-flash';
-                    else if (key === 'ia_enabled') newConfigs[key] = 'true';
+                    else if (key === 'ia_enabled') newConfigs[key] = 'false';
                     else newConfigs[key] = '';
                 }
             }

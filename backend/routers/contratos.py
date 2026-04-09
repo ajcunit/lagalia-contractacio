@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func, desc, nulls_last
 from typing import List, Optional, Dict
 from datetime import date, datetime
-from database import get_db
+from core.database import get_db
 import models
 import schemas
 from services.auth_service import get_current_user

@@ -1,15 +1,31 @@
+# Core
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
-sqlalchemy>=2.0.25
 pydantic>=2.0.0
-httpx>=0.26.0
-python-multipart>=0.0.6
-aiosqlite>=0.19.0
-python-dateutil>=2.8.0
-apscheduler
-passlib[bcrypt]>=1.7.4
-python-jose[cryptography]>=3.3.0
-ldap3>=2.9.0
+pydantic-settings>=2.0.0
+
+# Database
+sqlalchemy>=2.0.25
 psycopg2-binary>=2.9.9
+
+# Auth
+python-jose[cryptography]>=3.3.0
+argon2-cffi>=23.1.0
+python-multipart>=0.0.6
+
+# HTTP
+httpx>=0.26.0
+
+# Rate Limiting
+slowapi>=0.1.9
+
+# Scheduling
+apscheduler>=3.10.0
+
+# LDAP (optional)
+ldap3>=2.9.0
+
+# Utils
 python-dotenv>=1.0.0
+python-dateutil>=2.8.0
 aiofiles>=23.2.1

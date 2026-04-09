@@ -1,13 +1,18 @@
+"""
+Router d'auditoria — Anàlisi de red flags i riscos en contractació.
+SEGUR: Sense SQL raw amb concatenació, usa ORM parametritzat.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import func, and_, cast, Float
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-from database import get_db
+from datetime import datetime, timedelta
+from core.database import get_db
 import models
 from services.auth_service import get_current_user
 from services.ai_service import AIService
-from services.access_control import get_sql_dept_filter
+from services.access_control import apply_department_filter
 
 router = APIRouter(prefix="/auditoria", tags=["auditoria"])
 
@@ -25,21 +30,37 @@ def get_posibles_fraccionamientos(
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
     check_auditoria_permission(current_user)
-    dept_filter = get_sql_dept_filter(current_user, x_view_mode)
     
-    # Contractes menors adjudicats al mateix proveïdor en l'últim any que sumen > 15.000€ i tenen > 1 contracte
-    query = f"""
-    SELECT adjudicatari as nombre, SUM(import_adjudicacio) as importe_total, COUNT(id) as numero_contratos
-    FROM contratos_menores 
-    WHERE data_adjudicacio >= date('now', '-1 year') AND adjudicatari IS NOT NULL {dept_filter}
-    GROUP BY adjudicatari 
-    HAVING SUM(import_adjudicacio) >= 15000 AND COUNT(id) > 1
-    ORDER BY importe_total DESC
-    """
+    one_year_ago = datetime.now() - timedelta(days=365)
     
-    result = db.execute(text(query)).mappings().all()
-    # Convert mappings to dicts
-    return [dict(row) for row in result]
+    query = db.query(
+        models.ContratoMenor.adjudicatari.label("nombre"),
+        func.sum(models.ContratoMenor.import_adjudicacio).label("importe_total"),
+        func.count(models.ContratoMenor.id).label("numero_contratos"),
+    ).filter(
+        models.ContratoMenor.data_adjudicacio >= one_year_ago,
+        models.ContratoMenor.adjudicatari.isnot(None),
+    )
+    
+    # Aplicar filtre de departament de forma segura
+    if current_user.rol not in ['admin', 'responsable_contratacion'] or x_view_mode != 'admin':
+        if current_user.departamento_id:
+            query = query.filter(models.ContratoMenor.departamento_id == current_user.departamento_id)
+        else:
+            return []
+    
+    results = query.group_by(
+        models.ContratoMenor.adjudicatari
+    ).having(
+        and_(
+            func.sum(models.ContratoMenor.import_adjudicacio) >= 15000,
+            func.count(models.ContratoMenor.id) > 1,
+        )
+    ).order_by(
+        func.sum(models.ContratoMenor.import_adjudicacio).desc()
+    ).all()
+    
+    return [{"nombre": r.nombre, "importe_total": float(r.importe_total or 0), "numero_contratos": r.numero_contratos} for r in results]
 
 @router.get("/redflags/bajas_temerarias")
 def get_bajas_temerarias(
@@ -48,29 +69,35 @@ def get_bajas_temerarias(
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
     check_auditoria_permission(current_user)
-    dept_filter = get_sql_dept_filter(current_user, x_view_mode)
     
-    # Adjudicacions un 20% més barates que el pressupost de licitació
-    # preu_adjudicar vs preu_licitar
-    query = f"""
-    SELECT id, codi_expedient, objecte_contracte, adjudicatari_nom, preu_licitar, preu_adjudicar, 
-           ((preu_licitar - preu_adjudicar) / NULLIF(preu_licitar, 0)) * 100 as porcentaje_baja
-    FROM contratos
-    WHERE preu_licitar > 0 AND preu_adjudicar > 0 {dept_filter}
-    AND preu_adjudicar <= preu_licitar * 0.8  -- Més d'un 20% de baixa
-    ORDER BY porcentaje_baja DESC
-    LIMIT 100
-    """
+    query = db.query(models.Contrato).filter(
+        models.Contrato.preu_licitar > 0,
+        models.Contrato.preu_adjudicar > 0,
+        models.Contrato.preu_adjudicar <= models.Contrato.preu_licitar * 0.8,
+    )
     
-    result = db.execute(text(query)).mappings().all()
-    return [dict(row) for row in result]
+    query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
+    
+    results = query.order_by(
+        ((models.Contrato.preu_licitar - models.Contrato.preu_adjudicar) / models.Contrato.preu_licitar).desc()
+    ).limit(100).all()
+    
+    return [
+        {
+            "id": c.id,
+            "codi_expedient": c.codi_expedient,
+            "objecte_contracte": c.objecte_contracte,
+            "adjudicatari_nom": c.adjudicatari_nom,
+            "preu_licitar": float(c.preu_licitar or 0),
+            "preu_adjudicar": float(c.preu_adjudicar or 0),
+            "porcentaje_baja": round(((c.preu_licitar - c.preu_adjudicar) / c.preu_licitar) * 100, 1) if c.preu_licitar else 0,
+        }
+        for c in results
+    ]
 
 @router.get("/redflags/falta_concurrencia")
 def get_falta_concurrencia(db: Session = Depends(get_db), current_user: models.Empleado = Depends(get_current_user)):
     check_auditoria_permission(current_user)
-    # This might require checking 'numero_licitadors' if we had that field. 
-    # Let's check for 'procediment' == 'Obert' but maybe very few bidders? We don't have numero_licitadors in model.
-    # Return empty for now or adapt
     return []
 
 @router.get("/redflags/caducidad_proxima")
@@ -80,19 +107,30 @@ def get_caducidad_proxima(
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
     check_auditoria_permission(current_user)
-    dept_filter = get_sql_dept_filter(current_user, x_view_mode)
     
-    query = f"""
-    SELECT id, codi_expedient, objecte_contracte, adjudicatari_nom, data_finalitzacio_calculada as fecha_fin
-    FROM contratos
-    WHERE estat_actual = 'Execució' {dept_filter}
-    AND data_finalitzacio_calculada >= date('now') 
-    AND data_finalitzacio_calculada <= date('now', '+6 months')
-    ORDER BY data_finalitzacio_calculada ASC
-    """
+    now = datetime.now()
+    six_months = now + timedelta(days=180)
     
-    result = db.execute(text(query)).mappings().all()
-    return [dict(row) for row in result]
+    query = db.query(models.Contrato).filter(
+        models.Contrato.estat_actual == 'Execució',
+        models.Contrato.data_finalitzacio_calculada >= now,
+        models.Contrato.data_finalitzacio_calculada <= six_months,
+    )
+    
+    query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
+    
+    results = query.order_by(models.Contrato.data_finalitzacio_calculada.asc()).all()
+    
+    return [
+        {
+            "id": c.id,
+            "codi_expedient": c.codi_expedient,
+            "objecte_contracte": c.objecte_contracte,
+            "adjudicatari_nom": c.adjudicatari_nom,
+            "fecha_fin": str(c.data_finalitzacio_calculada) if c.data_finalitzacio_calculada else None,
+        }
+        for c in results
+    ]
 
 @router.post("/ai-analysis")
 async def get_ai_analysis(
@@ -108,7 +146,7 @@ async def get_ai_analysis(
     caducidad = get_caducidad_proxima(db, current_user, x_view_mode)
     
     data = {
-        "posibles_fraccionamientos": fraccionamientos[:5],  # Limitem per no ofegar el prompt
+        "posibles_fraccionamientos": fraccionamientos[:5],
         "bajas_temerarias_excesivas": bajas[:5],
         "caducidad_proxima": caducidad[:5]
     }

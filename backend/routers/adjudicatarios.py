@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Dict, Any
-from database import get_db
+from core.database import get_db
 import models
 from services.auth_service import get_current_user
 

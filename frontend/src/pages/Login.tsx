@@ -15,8 +15,8 @@ export default function Login() {
         setLoading(true);
         setError(null);
         try {
-            const data = await api.login(email, password);
-            localStorage.setItem('token', data.access_token);
+            await api.login(email, password);
+            // Token storage is handled by api.login() now
             navigate('/dashboard');
         } catch (err: any) {
             setError(err.message || 'Error en autenticar');
@@ -67,7 +67,7 @@ export default function Login() {
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                     className="input input-bordered w-full !pl-12 h-12 bg-slate-50 focus:bg-white transition-colors"
-                                    placeholder="admin@admin.com"
+                                    placeholder="correu@empresa.cat"
                                     required
                                 />
                             </div>
