@@ -163,4 +163,5 @@ def read_users_me(current_user: models.Empleado = Depends(get_current_user)):
         "rol": current_user.rol,
         "departamento_id": current_user.departamento_id,
         "permiso_auditoria": current_user.permiso_auditoria,
+        "permiso_pla_contractacio": current_user.permiso_pla_contractacio,
     }

@@ -33,6 +33,9 @@ def _serialize(entrada: models.PlaContractacioEntrada) -> dict:
         "observacions": entrada.observacions,
         "subvencionat": entrada.subvencionat,
         "import_estimat": float(entrada.import_estimat) if entrada.import_estimat else None,
+        "estat": entrada.estat,
+        "departamento_id": entrada.departamento_id,
+        "departamento_nom": entrada.departamento.nombre if entrada.departamento else None,
         "contrato_id": entrada.contrato_id,
         "codi_expedient": entrada.contrato.codi_expedient if entrada.contrato else None,
         "creat_per_nom": entrada.creat_per.nombre if entrada.creat_per else None,
@@ -48,15 +51,22 @@ def get_pla_contractacio(
 ):
     check_pla_permission(current_user)
     year = any_exercici or datetime.now().year
-    entrades = (
-        db.query(models.PlaContractacioEntrada)
-        .filter(models.PlaContractacioEntrada.any_exercici == year)
-        .order_by(
-            models.PlaContractacioEntrada.trimestre,
-            models.PlaContractacioEntrada.id,
-        )
-        .all()
+    entrades_query = db.query(models.PlaContractacioEntrada).filter(
+        models.PlaContractacioEntrada.any_exercici == year
     )
+    
+    # Filter by department if not admin/responsable
+    if current_user.rol not in ['admin', 'responsable_contratacion']:
+        if current_user.departamento_id:
+            entrades_query = entrades_query.filter(models.PlaContractacioEntrada.departamento_id == current_user.departamento_id)
+        else:
+            # If no department, they shouldn't see anything or only their own
+            entrades_query = entrades_query.filter(models.PlaContractacioEntrada.creat_per_id == current_user.id)
+
+    entrades = entrades_query.order_by(
+        models.PlaContractacioEntrada.trimestre,
+        models.PlaContractacioEntrada.id,
+    ).all()
     return [_serialize(e) for e in entrades]
 
 
@@ -76,6 +86,19 @@ def create_entrada(
         if not contrato:
             raise HTTPException(status_code=404, detail="Contracte no trobat")
 
+    is_admin = current_user.rol in ['admin', 'responsable_contratacion']
+    
+    dep_id = data.departamento_id
+    estat = 'aprovat'
+
+    if not is_admin:
+        estat = 'pendent'
+        # Regular users can only create for their own department
+        if dep_id and dep_id != current_user.departamento_id:
+            raise HTTPException(status_code=403, detail="Només pots crear entrades pel teu departament")
+        if not dep_id:
+            dep_id = current_user.departamento_id
+
     entrada = models.PlaContractacioEntrada(
         any_exercici=data.any_exercici,
         trimestre=data.trimestre,
@@ -85,6 +108,8 @@ def create_entrada(
         observacions=data.observacions,
         subvencionat=data.subvencionat,
         import_estimat=data.import_estimat,
+        estat=estat,
+        departamento_id=dep_id,
         contrato_id=data.contrato_id,
         creat_per_id=current_user.id,
     )
@@ -107,6 +132,22 @@ def update_entrada(
     ).first()
     if not entrada:
         raise HTTPException(status_code=404, detail="Entrada no trobada")
+
+    is_admin = current_user.rol in ['admin', 'responsable_contratacion']
+    if not is_admin:
+        # Check ownership or department
+        if entrada.departamento_id != current_user.departamento_id and entrada.creat_per_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No pots editar aquesta entrada")
+        
+        # Non-admins cannot change the state out of 'pendent', nor can they edit 'aprovat' entries easily
+        # but let's just make sure they can't set it to 'aprovat'.
+        if 'estat' in data.model_dump(exclude_unset=True):
+            if data.estat == 'aprovat':
+                raise HTTPException(status_code=403, detail="No pots aprovar entrades")
+        # Ensure they can't change department
+        if 'departamento_id' in data.model_dump(exclude_unset=True):
+            if data.departamento_id != current_user.departamento_id:
+                raise HTTPException(status_code=403, detail="No pots canviar-ho a un departament que no és el teu")
 
     if data.trimestre is not None and data.trimestre not in (1, 2, 3, 4):
         raise HTTPException(status_code=422, detail="El trimestre ha de ser entre 1 i 4")
@@ -137,6 +178,12 @@ def delete_entrada(
     ).first()
     if not entrada:
         raise HTTPException(status_code=404, detail="Entrada no trobada")
+        
+    is_admin = current_user.rol in ['admin', 'responsable_contratacion']
+    if not is_admin:
+        if entrada.departamento_id != current_user.departamento_id and entrada.creat_per_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No pots esborrar aquesta entrada")
+            
     db.delete(entrada)
     db.commit()
 

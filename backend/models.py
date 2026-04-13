@@ -443,6 +443,10 @@ class PlaContractacioEntrada(Base):
     observacions = Column(Text)
     subvencionat = Column(Boolean, default=False)
     import_estimat = Column(Numeric(15, 2), nullable=True)
+    estat = Column(String(50), default='aprovat') # 'pendent' o 'aprovat'
+    
+    departamento_id = Column(Integer, ForeignKey("departamentos.id"), nullable=True)
+    departamento = relationship("Departamento", foreign_keys=[departamento_id])
 
     # Optional link to an existing registered contract
     contrato_id = Column(Integer, ForeignKey("contratos.id"), nullable=True)

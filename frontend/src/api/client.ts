@@ -939,13 +939,16 @@ export interface PlaContractacioEntrada {
     observacions?: string;
     subvencionat: boolean;
     import_estimat?: number;
+    estat: string;
+    departamento_id?: number;
+    departamento_nom?: string;
     contrato_id?: number;
     codi_expedient?: string;
     creat_per_nom?: string;
     creat_at?: string;
 }
 
-export type PlaContractacioEntradaCreate = Omit<PlaContractacioEntrada, 'id' | 'codi_expedient' | 'creat_per_nom' | 'creat_at'>;
-export type PlaContractacioEntradaUpdate = Partial<PlaContractacioEntradaCreate>;
+export type PlaContractacioEntradaCreate = Omit<PlaContractacioEntrada, 'id' | 'estat' | 'departamento_nom' | 'codi_expedient' | 'creat_per_nom' | 'creat_at'>;
+export type PlaContractacioEntradaUpdate = Partial<PlaContractacioEntradaCreate> & { estat?: string };
 
 export const api = new ApiClient(API_BASE_URL);

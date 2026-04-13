@@ -53,6 +53,8 @@ def run_migrations():
     migrations = [
         # v2.1 — Pla de Contractació
         "ALTER TABLE empleados ADD COLUMN IF NOT EXISTS permiso_pla_contractacio BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE pla_contractacio_entrades ADD COLUMN IF NOT EXISTS estat VARCHAR(50) DEFAULT 'aprovat'",
+        "ALTER TABLE pla_contractacio_entrades ADD COLUMN IF NOT EXISTS departamento_id INTEGER REFERENCES departamentos(id)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

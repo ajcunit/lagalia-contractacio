@@ -523,6 +523,7 @@ class PlaContractacioEntradaCreate(BaseModel):
     subvencionat: bool = False
     import_estimat: Optional[float] = None
     contrato_id: Optional[int] = None
+    departamento_id: Optional[int] = None
 
 
 class PlaContractacioEntradaUpdate(BaseModel):
@@ -534,6 +535,8 @@ class PlaContractacioEntradaUpdate(BaseModel):
     subvencionat: Optional[bool] = None
     import_estimat: Optional[float] = None
     contrato_id: Optional[int] = None
+    departamento_id: Optional[int] = None
+    estat: Optional[str] = None
 
 
 class PlaContractacioEntradaRead(BaseModel):
@@ -546,6 +549,9 @@ class PlaContractacioEntradaRead(BaseModel):
     observacions: Optional[str] = None
     subvencionat: bool
     import_estimat: Optional[float] = None
+    estat: str
+    departamento_id: Optional[int] = None
+    departamento_nom: Optional[str] = None
     contrato_id: Optional[int] = None
     codi_expedient: Optional[str] = None   # denormalized from contrato
     creat_per_nom: Optional[str] = None

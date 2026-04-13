@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, PlaContractacioEntrada, PlaContractacioEntradaCreate, ContracteCaducant, Empleado, ContratoListItem } from '../api/client';
+import { api, PlaContractacioEntrada, PlaContractacioEntradaCreate, ContracteCaducant, Empleado, ContratoListItem, Departamento } from '../api/client';
 import { Link } from 'react-router-dom';
 import {
     ClipboardList, Plus, Pencil, Trash2, ExternalLink,
@@ -25,6 +25,7 @@ const EMPTY_FORM: PlaContractacioEntradaCreate = {
     subvencionat: false,
     import_estimat: undefined,
     contrato_id: undefined,
+    departamento_id: undefined,
 };
 
 interface ModalState {
@@ -46,6 +47,7 @@ export default function PlaContractacio() {
     const [year, setYear] = useState(new Date().getFullYear());
     const [entrades, setEntrades] = useState<PlaContractacioEntrada[]>([]);
     const [caducants, setCaducants] = useState<ContracteCaducant[]>([]);
+    const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
     const [loading, setLoading] = useState(true);
     const [modal, setModal] = useState<ModalState>({ open: false, mode: 'create', trimestre: 1 });
     const [form, setForm] = useState<PlaContractacioEntradaCreate>(EMPTY_FORM);
@@ -57,6 +59,7 @@ export default function PlaContractacio() {
 
     useEffect(() => {
         api.getMe().then(setUser).catch(console.error);
+        api.getDepartamentos().then(setDepartamentos).catch(console.error);
     }, []);
 
     const loadData = useCallback(async () => {
@@ -96,7 +99,12 @@ export default function PlaContractacio() {
     }, [contratoSearch.query]);
 
     const openCreate = (trimestre: number) => {
-        setForm({ ...EMPTY_FORM, any_exercici: year, trimestre });
+        setForm({ 
+            ...EMPTY_FORM, 
+            any_exercici: year, 
+            trimestre,
+            departamento_id: (user?.rol === 'admin' || user?.rol === 'responsable_contratacion') ? undefined : user?.departamento_id
+        });
         setContratoSearch({ query: '', results: [], loading: false, selected: undefined });
         setModal({ open: true, mode: 'create', trimestre });
     };
@@ -112,6 +120,7 @@ export default function PlaContractacio() {
             subvencionat: entrada.subvencionat,
             import_estimat: entrada.import_estimat,
             contrato_id: entrada.contrato_id,
+            departamento_id: entrada.departamento_id,
         });
         setContratoSearch({
             query: entrada.codi_expedient || '',
@@ -161,6 +170,16 @@ export default function PlaContractacio() {
     };
 
     const canEdit = user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.permiso_pla_contractacio;
+    const isAdmin = user?.rol === 'admin' || user?.rol === 'responsable_contratacion';
+
+    const handleApprove = async (id: number) => {
+        try {
+            await api.updatePlaEntrada(id, { estat: 'aprovat' });
+            loadData();
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const formatCurrency = (v?: number) => v != null
         ? new Intl.NumberFormat('ca-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)
@@ -253,10 +272,16 @@ export default function PlaContractacio() {
                                             </thead>
                                             <tbody className="divide-y divide-slate-50">
                                                 {rows.map(row => (
-                                                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                    <tr key={row.id} className={`hover:bg-slate-50/80 transition-colors group ${row.estat === 'pendent' ? 'bg-amber-50/30' : ''}`}>
                                                         <td className="px-4 py-3">
-                                                            <span className="font-medium text-slate-800 line-clamp-2 text-xs" title={row.objecte}>{row.objecte}</span>
-                                                            {row.observacions && <p className="text-[10px] text-slate-400 mt-0.5 truncate" title={row.observacions}>{row.observacions}</p>}
+                                                            <div className="flex items-center">
+                                                                <span className="font-medium text-slate-800 line-clamp-2 text-xs" title={row.objecte}>{row.objecte}</span>
+                                                                {row.estat === 'pendent' && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 ml-2 shadow-sm border border-amber-200">Pendent</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {row.departamento_nom && <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">{row.departamento_nom}</span>}
+                                                                {row.observacions && <span className="text-[10px] text-slate-400 truncate" title={row.observacions}>{row.observacions}</span>}
+                                                            </div>
                                                         </td>
                                                         <td className="px-3 py-3">
                                                             {row.tipus_contracte && (
@@ -284,7 +309,16 @@ export default function PlaContractacio() {
                                                         </td>
                                                         {canEdit && (
                                                             <td className="px-2 py-3">
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                                                                    {isAdmin && row.estat === 'pendent' && (
+                                                                        <button
+                                                                            onClick={() => handleApprove(row.id)}
+                                                                            className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 text-[10px] font-bold transition-colors mr-1"
+                                                                            title="Aprovar"
+                                                                        >
+                                                                            Aprovar
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         onClick={() => openEdit(row)}
                                                                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-indigo-100 text-slate-400 hover:text-indigo-600 transition-colors"
@@ -438,7 +472,24 @@ export default function PlaContractacio() {
                                 </div>
                             </div>
 
-                            {/* Àmbit */}
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Departament */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Departament</label>
+                                    <select
+                                        value={form.departamento_id || ''}
+                                        onChange={e => setForm(f => ({ ...f, departamento_id: e.target.value ? Number(e.target.value) : undefined }))}
+                                        disabled={!isAdmin}
+                                        className="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20 outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">— Sense Assignar —</option>
+                                        {departamentos.map(d => (
+                                            <option key={d.id} value={d.id}>{d.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Àmbit */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Àmbit Responsable</label>
                                 <input
@@ -447,6 +498,8 @@ export default function PlaContractacio() {
                                     placeholder="p.ex. Medi Ambient, Turisme..."
                                     className="w-full h-10 px-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/20 outline-none"
                                 />
+                            </div>
+
                             </div>
 
                             {/* Observacions */}
