@@ -44,6 +44,31 @@ for i in range(15):
             time.sleep(2)
 
 
+def run_migrations():
+    """
+    Aplica migracions de columnes noves a taules existents.
+    Segur de re-executar: utilitza ADD COLUMN IF NOT EXISTS.
+    """
+    from sqlalchemy import text
+    migrations = [
+        # v2.1 — Pla de Contractació
+        "ALTER TABLE empleados ADD COLUMN IF NOT EXISTS permiso_pla_contractacio BOOLEAN DEFAULT FALSE",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception as e:
+                print(f"WARNING: Migration skipped or failed: {sql[:60]}... → {e}")
+
+try:
+    run_migrations()
+    print("INFO:    Database migrations applied")
+except Exception as e:
+    print(f"WARNING: Could not run migrations: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     start_scheduler()
