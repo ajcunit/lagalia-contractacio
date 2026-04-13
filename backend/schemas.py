@@ -372,6 +372,11 @@ class DashboardStats(BaseModel):
     contratos_posiblemente_finalizados: int  # Contractes possiblement finalitzats
     total_contratos_menores: int = 0
     total_importe_menores: float = 0.0
+    contratos_por_departamento: List[dict] = []
+    temps_mitja_tramitacio_dies: Optional[float] = None
+    licitadors_unics: int = 0
+    renovacions_critiques: List[dict] = []
+
 
 
 # Filtros de búsqueda

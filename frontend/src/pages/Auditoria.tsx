@@ -134,33 +134,36 @@ export default function Auditoria() {
                     )}
                 </div>
 
-                {/* Caducitat Pròxima */}
-                <div className="glass-card p-6 border-t-4 border-t-blue-500 xl:col-span-2">
+                {/* Renovacions Crítiques */}
+                <div className="glass-card p-6 border-t-4 border-t-rose-500 xl:col-span-2">
                     <div className="flex items-center gap-2 mb-4">
-                        <Clock className="text-blue-500" />
-                        <h2 className="text-lg font-bold text-slate-800">Caducitat Pròxima (&lt; 6 mesos i en execució)</h2>
+                        <Clock className="text-rose-500" />
+                        <h2 className="text-lg font-bold text-slate-800 flex justify-between w-full">
+                            Renovacions Crítiques (&lt; 6 mesos i en execució)
+                            <span className="badge badge-error badge-sm ml-2">{caducidad.length} Alertes</span>
+                        </h2>
                     </div>
                     {caducidad.length === 0 ? (
                         <p className="text-slate-500 italic">Cap alerta detectada.</p>
                     ) : (
-                        <div className="space-y-3 max-h-96 overflow-auto pr-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-auto pr-2 custom-scrollbar">
                             {caducidad.map((c, i) => (
                                 <Link 
-                                    to={`/contratos/${c.id}`}
+                                    to={`/contratos?busqueda=${encodeURIComponent(c.codi_expedient)}`} 
                                     key={i} 
-                                    className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-center justify-between hover:border-blue-300 hover:bg-blue-100/50 transition-colors cursor-pointer group"
+                                    className="block p-4 bg-rose-50 rounded-xl border border-rose-100 hover:border-rose-300 hover:bg-rose-100/50 transition-colors cursor-pointer group"
                                 >
-                                    <div>
-                                        <h3 className="font-mono text-xs font-bold text-blue-900 mb-1 group-hover:text-blue-700 transition-colors flex items-center gap-2">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h3 className="font-mono text-sm font-bold text-rose-900 group-hover:text-rose-700 transition-colors flex items-center gap-2 bg-rose-100 px-2 py-0.5 rounded">
                                             {c.codi_expedient}
-                                            <ExternalLink size={12} className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <ExternalLink size={14} className="text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         </h3>
-                                        <p className="text-sm font-medium text-slate-800 line-clamp-1">{c.objecte_contracte}</p>
+                                        {c.fecha_fin && (
+                                            <span className="text-xs font-bold text-slate-700">Expira: {new Date(c.fecha_fin).toLocaleDateString('ca-ES')}</span>
+                                        )}
                                     </div>
-                                    <div className="text-right pl-4 shrink-0">
-                                        <div className="text-xs text-blue-600 mb-1">Finalitza el</div>
-                                        <div className="font-bold text-blue-800">{new Date(c.fecha_fin).toLocaleDateString('ca-ES')}</div>
-                                    </div>
+                                    <p className="text-sm font-medium text-slate-800 line-clamp-2 mb-2" title={c.objecte_contracte}>{c.objecte_contracte}</p>
+                                    <p className="text-xs text-slate-500 truncate">{c.adjudicatari_nom}</p>
                                 </Link>
                             ))}
                         </div>

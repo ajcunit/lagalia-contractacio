@@ -112,9 +112,7 @@ def get_caducidad_proxima(
     six_months = now + timedelta(days=180)
     
     query = db.query(models.Contrato).filter(
-        models.Contrato.estat_actual == 'Execució',
-        models.Contrato.data_finalitzacio_calculada >= now,
-        models.Contrato.data_finalitzacio_calculada <= six_months,
+        models.Contrato.alerta_finalitzacio == True
     )
     
     query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)

@@ -173,11 +173,31 @@ export interface DashboardStats {
     total_importe: number;
     ultima_sincronizacion?: string;
     contratos_este_mes: number;
-    top_adjudicatarios: Array<{ nombre: string; contratos: number; volumen: number }>;
+    top_adjudicatarios: Array<{ 
+        nombre: string; 
+        contratos: number; 
+        volumen: number;
+        desglose?: Array<{codi_expedient: string, objecte: string, importe: number}>;
+    }>;
     contratos_proximos_finalizar: number;
     contratos_posiblemente_finalizados: number;
     total_contratos_menores: number;
     total_importe_menores: number;
+    contratos_por_departamento: Array<{
+        departamento: string;
+        contratos: number;
+        volumen: number;
+    }>;
+    temps_mitja_tramitacio_dies?: number;
+    licitadors_unics: number;
+    renovacions_critiques: Array<{
+        id: number;
+        codi_expedient: string;
+        objecte: string;
+        adjudicatari?: string;
+        data_finalitzacio?: string;
+        importe: number;
+    }>;
 }
 
 export interface FiltroOpciones {
@@ -466,8 +486,13 @@ class ApiClient {
     }
 
     // Dashboard
-    async getDashboardStats(): Promise<DashboardStats> {
-        return this.request<DashboardStats>('/contratos/stats');
+    async getDashboardStats(params?: { year?: number, importe_min?: number, importe_max?: number }): Promise<DashboardStats> {
+        const query = new URLSearchParams();
+        if (params?.year) query.append('year', String(params.year));
+        if (params?.importe_min !== undefined) query.append('importe_min', String(params.importe_min));
+        if (params?.importe_max !== undefined) query.append('importe_max', String(params.importe_max));
+        const q = query.toString();
+        return this.request<DashboardStats>(`/contratos/stats${q ? '?' + q : ''}`);
     }
 
     // Departamentos

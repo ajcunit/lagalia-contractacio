@@ -131,12 +131,27 @@ def list_contratos(
 
 @router.get("/stats", response_model=schemas.DashboardStats)
 def get_dashboard_stats(
+    year: Optional[int] = Query(None, description="Filtrar per any de la data d'inici"),
+    importe_min: Optional[float] = Query(None, description="Import mínim d'adjudicació"),
+    importe_max: Optional[float] = Query(None, description="Import màxim d'adjudicació"),
     db: Session = Depends(get_db),
     current_user: models.Empleado = Depends(get_current_user),
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
     base_query = apply_department_filter(db.query(models.Contrato), models.Contrato, current_user, x_view_mode)
     base_menores_query = apply_department_filter(db.query(models.ContratoMenor), models.ContratoMenor, current_user, x_view_mode)
+
+    if year is not None:
+        base_query = base_query.filter(func.extract('year', models.Contrato.data_inici) == year)
+        base_menores_query = base_menores_query.filter(models.ContratoMenor.exercici == year)
+        
+    if importe_min is not None:
+        base_query = base_query.filter(models.Contrato.import_adjudicacio_amb_iva >= importe_min)
+        base_menores_query = base_menores_query.filter(models.ContratoMenor.import_adjudicacio >= importe_min)
+        
+    if importe_max is not None:
+        base_query = base_query.filter(models.Contrato.import_adjudicacio_amb_iva <= importe_max)
+        base_menores_query = base_menores_query.filter(models.ContratoMenor.import_adjudicacio <= importe_max)
 
     # Total contratos
     total_contratos = base_query.count()
@@ -181,8 +196,32 @@ def get_dashboard_stats(
         nulls_last(desc(func.sum(models.Contrato.import_adjudicacio_amb_iva)))
     ).limit(10).all()
     
+    top_adjudicatarios_list = [adj for adj, count, vol in top_adj if adj]
+    contracts_by_adj = {}
+    if top_adjudicatarios_list:
+        contracts = base_query.filter(models.Contrato.adjudicatari_nom.in_(top_adjudicatarios_list)).with_entities(
+            models.Contrato.adjudicatari_nom,
+            models.Contrato.codi_expedient,
+            models.Contrato.objecte_contracte,
+            models.Contrato.import_adjudicacio_amb_iva
+        ).order_by(desc(models.Contrato.import_adjudicacio_amb_iva)).all()
+        
+        for c in contracts:
+            if c.adjudicatari_nom not in contracts_by_adj:
+                contracts_by_adj[c.adjudicatari_nom] = []
+            contracts_by_adj[c.adjudicatari_nom].append({
+                "codi_expedient": c.codi_expedient,
+                "objecte": c.objecte_contracte,
+                "importe": float(c.import_adjudicacio_amb_iva or 0)
+            })
+    
     top_adjudicatarios = [
-        {"nombre": adj, "contratos": count, "volumen": float(vol or 0)}
+        {
+            "nombre": adj, 
+            "contratos": count, 
+            "volumen": float(vol or 0),
+            "desglose": contracts_by_adj.get(adj, [])
+        }
         for adj, count, vol in top_adj
     ]
     
@@ -196,9 +235,76 @@ def get_dashboard_stats(
         models.Contrato.possiblement_finalitzat == True
     ).count()
     
+    # Contratos por departamento
+    dept_query = base_query.join(
+        models.Departamento, models.Contrato.departamento_id == models.Departamento.id, isouter=True
+    ).with_entities(
+        func.coalesce(models.Departamento.nombre, 'No assignat').label('departamento'),
+        func.count(models.Contrato.id).label('contratos'),
+        func.sum(models.Contrato.import_adjudicacio_amb_iva).label('volumen')
+    ).group_by(
+        'departamento'
+    ).all()
+    
+    contratos_por_departamento = [
+        {
+            "departamento": str(d.departamento),
+            "contratos": d.contratos,
+            "volumen": float(d.volumen or 0)
+        }
+        for d in dept_query
+    ]
+    
     # Contratos Menores
     total_menores = base_menores_query.count()
     total_importe_menores = base_menores_query.with_entities(func.sum(models.ContratoMenor.import_adjudicacio)).scalar() or 0
+
+    # 1. Temps mitjà de tramitació
+    avg_diff_query = base_query.filter(
+        models.Contrato.data_inici.isnot(None),
+        models.Contrato.data_formalitzacio.isnot(None)
+    ).with_entities(
+        models.Contrato.data_inici,
+        models.Contrato.data_formalitzacio
+    ).all()
+    
+    total_days = 0
+    count_days = 0
+    for c in avg_diff_query:
+        if c.data_formalitzacio >= c.data_inici:
+            total_days += (c.data_formalitzacio - c.data_inici).days
+            count_days += 1
+    temps_mitja_tramitacio_dies = (total_days / count_days) if count_days > 0 else None
+
+    # 2. Renovacions crítiques
+    renovacions_query = base_query.filter(
+        models.Contrato.alerta_finalitzacio == True
+    ).order_by(models.Contrato.data_finalitzacio_calculada.asc()).limit(10).all()
+    
+    renovacions_critiques = [
+        {
+            "id": r.id,
+            "codi_expedient": r.codi_expedient,
+            "objecte": r.objecte_contracte,
+            "adjudicatari": r.adjudicatari_nom,
+            "data_finalitzacio": r.data_finalitzacio_calculada.isoformat() if r.data_finalitzacio_calculada else None,
+            "importe": float(r.import_adjudicacio_amb_iva or 0)
+        }
+        for r in renovacions_query
+    ]
+
+    # 3. Licitadors únics
+    json_data_query = base_query.filter(models.Contrato.datos_json.isnot(None)).with_entities(models.Contrato.datos_json).limit(5000).all()
+    licitadors_unics = 0
+    for j in json_data_query:
+        try:
+            js = j.datos_json or {}
+            num = str(js.get('numero_de_licitadores_participantes', js.get('numero_ofertas_recibidas', '')))
+            if num == '1' or num == '1.0':
+                licitadors_unics += 1
+        except Exception:
+            pass
+
 
     return schemas.DashboardStats(
         total_contratos=total_contratos,
@@ -211,7 +317,11 @@ def get_dashboard_stats(
         contratos_proximos_finalizar=contratos_proximos,
         contratos_posiblemente_finalizados=contratos_finalizados,
         total_contratos_menores=total_menores,
-        total_importe_menores=float(total_importe_menores)
+        total_importe_menores=float(total_importe_menores),
+        contratos_por_departamento=contratos_por_departamento,
+        temps_mitja_tramitacio_dies=temps_mitja_tramitacio_dies,
+        licitadors_unics=licitadors_unics,
+        renovacions_critiques=renovacions_critiques
     )
 
 
