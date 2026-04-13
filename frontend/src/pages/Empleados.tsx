@@ -147,10 +147,9 @@ export default function Empleados() {
         }
     };
 
-    const getDepartamentoNombre = (deptId?: number) => {
-        if (!deptId) return 'Sense assignar';
-        const dept = departamentos.find((d) => d.id === deptId);
-        return dept?.nombre || 'Desconegut';
+    const getDepartamentoNombre = (departamentos?: Departamento[]) => {
+        if (!departamentos || departamentos.length === 0) return 'Sense assignar';
+        return departamentos.map(d => d.nombre).join(', ');
     };
 
     return (
@@ -217,7 +216,7 @@ export default function Empleados() {
                                         <tr>
                                             <SortableTh label="Nom" sortKey="nombre" sortConfig={sortConfig} onSort={requestSort} />
                                             <SortableTh label="Email" sortKey="email" sortConfig={sortConfig} onSort={requestSort} />
-                                            <SortableTh label="Departament" sortKey="departamento_id" sortConfig={sortConfig} onSort={requestSort} />
+                                            <SortableTh label="Departaments" sortKey="departamentos" sortConfig={sortConfig} onSort={requestSort} />
                                             <SortableTh label="Rol" sortKey="rol" sortConfig={sortConfig} onSort={requestSort} />
                                             <SortableTh label="Estat" sortKey="activo" sortConfig={sortConfig} onSort={requestSort} />
                                             <th>Accions</th>
@@ -239,7 +238,7 @@ export default function Empleados() {
                                                     </div>
                                                 </td>
                                                 <td className="text-slate-600">{emp.email}</td>
-                                                <td className="text-slate-700">{getDepartamentoNombre(emp.departamento_id)}</td>
+                                                <td className="text-slate-700">{getDepartamentoNombre(emp.departamentos)}</td>
                                                 <td>{getRolBadge(emp.rol)}</td>
                                                 <td>
                                                     {emp.activo ? (

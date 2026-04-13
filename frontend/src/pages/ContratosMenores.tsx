@@ -123,7 +123,7 @@ export default function ContratosMenores({ hideHeader = false }: ContratosMenore
         const targetDept = deptId ? parseInt(deptId) : null;
         if (selectedContracts.size === 0) return;
         try {
-            await api.asignarMasivoMenores(Array.from(selectedContracts), targetDept);
+            await api.asignarMasivoMenores(Array.from(selectedContracts), targetDept ? [targetDept] : []);
             await loadContratos();
             setSelectedContracts(new Set());
         } catch (err) {
@@ -257,6 +257,7 @@ export default function ContratosMenores({ hideHeader = false }: ContratosMenore
                                     <SortableTh label="Adjudicatari" sortKey="adjudicatari" sortConfig={sortConfig} onSort={requestSort} />
                                     <SortableTh label="Import" sortKey="import_adjudicacio" sortConfig={sortConfig} onSort={requestSort} />
                                     <SortableTh label="Exercici" sortKey="exercici" sortConfig={sortConfig} onSort={requestSort} />
+                                    <SortableTh label="Departaments" sortKey="departamentos" sortConfig={sortConfig} onSort={requestSort} />
                                     <th className="px-4 py-3 bg-slate-50 border-b border-slate-100"></th>
                                 </tr>
                             </thead>
@@ -280,6 +281,19 @@ export default function ContratosMenores({ hideHeader = false }: ContratosMenore
                                         <td className="px-4 py-3 font-bold text-slate-800 text-right tabular-nums whitespace-nowrap">{formatCurrency(contrato.import_adjudicacio)}</td>
                                         <td className="px-4 py-3 text-center tabular-nums">
                                             <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs font-bold">{contrato.exercici}</span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {contrato.departamentos && contrato.departamentos.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {contrato.departamentos.map(d => (
+                                                        <span key={d.id} className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold uppercase">
+                                                            {d.nombre}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400 text-xs">-</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-right tabular-nums"><ChevronRight size={16} className="text-slate-300 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" /></td>
                                     </tr>

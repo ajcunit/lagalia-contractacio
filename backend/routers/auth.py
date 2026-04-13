@@ -18,6 +18,7 @@ from core.rate_limiter import limiter
 from starlette.requests import Request
 from services.auth_service import AuthService
 import models
+import schemas
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -154,14 +155,6 @@ def logout(
     return {"message": "Sessió tancada correctament"}
 
 
-@router.get("/me")
+@router.get("/me", response_model=schemas.Empleado)
 def read_users_me(current_user: models.Empleado = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "nombre": current_user.nombre,
-        "rol": current_user.rol,
-        "departamento_id": current_user.departamento_id,
-        "permiso_auditoria": current_user.permiso_auditoria,
-        "permiso_pla_contractacio": current_user.permiso_pla_contractacio,
-    }
+    return current_user

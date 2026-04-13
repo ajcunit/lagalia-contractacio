@@ -13,13 +13,13 @@ export interface Empleado {
     id: number;
     nombre: string;
     email: string;
-    departamento_id?: number;
+    departamentos?: Departamento[];
     rol: string;
     activo: boolean;
     permiso_auditoria?: boolean;
     permiso_pla_contractacio?: boolean;
     fecha_creacion: string;
-    departamento?: Departamento;
+
 }
 
 export interface ContratoListItem {
@@ -31,7 +31,7 @@ export interface ContratoListItem {
     data_inici?: string;
     estat_actual?: string;
     estado_interno: string;
-    departamento_id?: number;
+    departamentos?: Departamento[];
     data_finalitzacio_calculada?: string;
     alerta_finalitzacio?: boolean;
     possiblement_finalitzat?: boolean;
@@ -81,7 +81,7 @@ export interface Contrato {
     codi_nuts?: string;
     descripcio_nuts?: string;
     forma_financament?: string;
-    departamento_id?: number;
+    departamentos?: Departamento[];
     estado_interno: string;
     hash_contenido?: string;
     fecha_primera_sincronizacion?: string;
@@ -105,6 +105,8 @@ export interface Contrato {
     url_json_adjudicacio?: string;
     url_json_formalitzacio?: string;
     url_json_anulacio?: string;
+    meses_aviso_vencimiento?: number;
+    responsables?: Empleado[];
 }
 
 export interface Sincronizacion {
@@ -135,9 +137,9 @@ export interface ContratoMenor {
     tipus_liquidacio?: string;
     data_liquidacio?: string;
     import_liquidacio?: number;
-    fecha_ultima_sincronizacion?: string;
-    departamento_id?: number;
+    departamentos?: Departamento[];
     estado_interno: string;
+    fecha_ultima_sincronizacion?: string;
 }
 
 export interface Duplicado {
@@ -582,19 +584,19 @@ class ApiClient {
         return this.request<Record<string, string>>(`/contratos/cpv-info?codes=${query}`);
     }
 
-    async updateContrato(id: number, data: { departamento_id?: number | null; estado_interno?: string }): Promise<Contrato> {
+    async updateContrato(id: number, data: { departamentos_ids?: number[] | null; estado_interno?: string; meses_aviso_vencimiento?: number | null; responsables_ids?: number[] }): Promise<Contrato> {
         return this.request<Contrato>(`/contratos/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
     }
 
-    async asignarMasivoDepartamentos(contratoIds: number[], departamentoId: number | null): Promise<{ message: string }> {
+    async asignarMasivoDepartamentos(contratoIds: number[], departamentosIds: number[] | null): Promise<{ message: string }> {
         return this.request<{ message: string }>('/contratos/asignar_masivo', {
             method: 'POST',
             body: JSON.stringify({
                 contrato_ids: contratoIds,
-                departamento_id: departamentoId
+                departamentos_ids: departamentosIds
             }),
         });
     }
@@ -624,19 +626,19 @@ class ApiClient {
         return this.request<ContratoMenor[]>(`/contratos-menores/?${query.toString()}`);
     }
 
-    async updateContratoMenor(id: number, data: { departamento_id?: number | null; estado_interno?: string }): Promise<ContratoMenor> {
+    async updateContratoMenor(id: number, data: { departamentos_ids?: number[] | null; estado_interno?: string }): Promise<ContratoMenor> {
         return this.request<ContratoMenor>(`/contratos-menores/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         });
     }
 
-    async asignarMasivoMenores(contratoIds: number[], departamentoId: number | null): Promise<{ message: string }> {
+    async asignarMasivoMenores(contratoIds: number[], departamentosIds: number[] | null): Promise<{ message: string }> {
         return this.request<{ message: string }>('/contratos-menores/asignar_masivo', {
             method: 'POST',
             body: JSON.stringify({
                 contrato_ids: contratoIds,
-                departamento_id: departamentoId
+                departamentos_ids: departamentosIds
             }),
         });
     }

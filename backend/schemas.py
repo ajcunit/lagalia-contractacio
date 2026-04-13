@@ -41,14 +41,14 @@ class EmpleadoBase(BaseModel):
 
 
 class EmpleadoCreate(EmpleadoBase):
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = []
     password: Optional[str] = None
 
 
 class EmpleadoUpdate(BaseModel):
     nombre: Optional[str] = None
     email: Optional[str] = None
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = None
     rol: Optional[str] = None
     activo: Optional[bool] = None
     permiso_auditoria: Optional[bool] = None
@@ -58,7 +58,7 @@ class EmpleadoUpdate(BaseModel):
 
 class Empleado(EmpleadoBase):
     id: int
-    departamento_id: Optional[int]
+    departamentos: List[DepartamentoBase] = []
     activo: bool
     fecha_creacion: datetime
 
@@ -67,7 +67,7 @@ class Empleado(EmpleadoBase):
 
 
 class EmpleadoConDepartamento(Empleado):
-    departamento: Optional[Departamento] = None
+    departamentos: List[Departamento] = []
 
 
 # Contrato Schemas
@@ -129,29 +129,32 @@ class ContratoBase(BaseModel):
     data_finalitzacio_calculada: Optional[date] = None
     alerta_finalitzacio: Optional[bool] = False
     possiblement_finalitzat: Optional[bool] = False
+    meses_aviso_vencimiento: Optional[int] = None
 
 
 class ContratoCreate(ContratoBase):
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = []
     estado_interno: str = "normal"
 
 
 class ContratoUpdate(ContratoBase):
     codi_expedient: Optional[str] = None
     estado_interno: Optional[str] = None
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = None
+    responsables_ids: Optional[List[int]] = None
 
 class ContratoMassAssign(BaseModel):
     contrato_ids: List[int]
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = None
 
 class Contrato(ContratoBase):
     id: int
-    departamento_id: Optional[int]
+    departamentos: List[DepartamentoBase] = []
     estado_interno: str
     hash_contenido: Optional[str]
     fecha_primera_sincronizacion: Optional[datetime]
     fecha_ultima_sincronizacion: Optional[datetime]
+    responsables: Optional[List[Empleado]] = []
 
     class Config:
         from_attributes = True
@@ -166,7 +169,7 @@ class ContratoListItem(BaseModel):
     data_inici: Optional[date]
     estat_actual: Optional[str]
     estado_interno: str
-    departamento_id: Optional[int]
+    departamentos: List[DepartamentoBase] = []
     data_finalitzacio_calculada: Optional[date] = None
     alerta_finalitzacio: Optional[bool] = False
     possiblement_finalitzat: Optional[bool] = False
@@ -197,12 +200,12 @@ class ContratoMenorBase(BaseModel):
 
 class ContratoMenorUpdate(BaseModel):
     codi_expedient: Optional[str] = None
-    departamento_id: Optional[int] = None
+    departamentos_ids: Optional[List[int]] = None
     estado_interno: Optional[str] = None
 
 class ContratoMenor(ContratoMenorBase):
     id: int
-    departamento_id: Optional[int] = None
+    departamentos: List[DepartamentoBase] = []
     estado_interno: str = 'normal'
     fecha_ultima_sincronizacion: Optional[datetime]
     datos_json_menor: Optional[dict] = None

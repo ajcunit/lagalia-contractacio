@@ -158,7 +158,7 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
         const targetDept = deptId ? parseInt(deptId) : null;
         if (selectedContracts.size === 0) return;
         try {
-            await api.asignarMasivoDepartamentos(Array.from(selectedContracts), targetDept);
+            await api.asignarMasivoDepartamentos(Array.from(selectedContracts), targetDept ? [targetDept] : []);
             await loadContratos();
             setSelectedContracts(new Set());
         } catch (err) {
@@ -373,7 +373,7 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                                                     {getEstadoInternoBadge(contrato.estado_interno)}
                                                     {getExpirationBadge(contrato)}
                                                 </div>
-                                                {contrato.departamento_id && <div className="text-[10px] text-primary-600 font-bold uppercase tracking-tight">{departamentos.find(d => d.id === contrato.departamento_id)?.nombre || "Dep."}</div>}
+                                                {contrato.departamentos && contrato.departamentos.length > 0 && <div className="text-[10px] text-primary-600 font-bold uppercase tracking-tight">{contrato.departamentos.map(d => d.nombre).join(', ')}</div>}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">

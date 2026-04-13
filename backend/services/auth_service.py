@@ -123,8 +123,12 @@ class AuthService:
                     email=email,
                     activo=True,
                     rol=new_rol,
-                    departamento_id=new_dept_id,
                 )
+                if new_dept_id:
+                    dept = db.query(models.Departamento).filter(models.Departamento.id == new_dept_id).first()
+                    if dept:
+                        user.departamentos = [dept]
+                
                 db.add(user)
                 db.commit()
                 db.refresh(user)
@@ -133,7 +137,12 @@ class AuthService:
                     user.nombre = entry.displayName.value
                 user.rol = new_rol
                 if new_dept_id:
-                    user.departamento_id = new_dept_id
+                    dept = db.query(models.Departamento).filter(models.Departamento.id == new_dept_id).first()
+                    if dept:
+                        # Prevent duplicate
+                        if dept.id not in [d.id for d in user.departamentos]:
+                            user.departamentos.clear()
+                            user.departamentos.append(dept)
                 user.activo = True
                 db.commit()
                 db.refresh(user)

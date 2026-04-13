@@ -38,7 +38,8 @@ export default function ConfiguracionPage() {
         'gemini_model': 'gemini-1.5-flash',
         'prompt_cpv_extract': '',
         'prompt_cpv_rank': '',
-        'prompt_auditoria': ''
+        'prompt_auditoria': '',
+        'dashboard_mesos_caducitat': '3'
     });
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export default function ConfiguracionPage() {
                 'ine10_code', 'sync_api_url', 'prorrogues_api_url', 'cpv_api_url', 
                 'ollama_url', 'ollama_model_cpv', 'ollama_model_auditoria', 'ollama_think', 
                 'ia_enabled', 'ai_provider', 'gemini_api_key', 'gemini_model',
-                'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria'
+                'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria', 'dashboard_mesos_caducitat'
             ];
             const newConfigs: Record<string, string> = {};
             
@@ -76,6 +77,7 @@ export default function ConfiguracionPage() {
                     else if (key === 'ai_provider') newConfigs[key] = 'disabled';
                     else if (key === 'gemini_model') newConfigs[key] = 'gemini-1.5-flash';
                     else if (key === 'ia_enabled') newConfigs[key] = 'false';
+                    else if (key === 'dashboard_mesos_caducitat') newConfigs[key] = '3';
                     else newConfigs[key] = '';
                 }
             }
@@ -252,6 +254,30 @@ export default function ConfiguracionPage() {
                                                 onChange={(e) => handleChange('cpv_api_url', e.target.value)}
                                                 placeholder="https://..."
                                             />
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                {/* Dashboards i Alertes */}
+                                <div className="glass-card p-6 mt-6">
+                                    <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4">
+                                        <Building2 size={20} className="text-primary-500" />
+                                        <h2>Dashboard i Alertes</h2>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">Mesos d'avís de venciment (Global)</label>
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                className="input input-bordered w-full" 
+                                                value={configs.dashboard_mesos_caducitat}
+                                                onChange={(e) => handleChange('dashboard_mesos_caducitat', e.target.value)}
+                                                placeholder="ex: 3"
+                                            />
+                                            <p className="text-xs text-slate-400">Temps en mesos en que un contracte es considera "proper a finalitzar" si no té avís personalitzat.</p>
                                         </div>
                                     </div>
                                 </div>

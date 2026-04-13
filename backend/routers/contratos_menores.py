@@ -49,16 +49,16 @@ def list_contratos_menores(
         query = query.filter(text("data_adjudicacio >= CURRENT_DATE - INTERVAL '1 year'"))
 
     if departamento_id:
-        query = query.filter(models.ContratoMenor.departamento_id == departamento_id)
-
+        query = query.filter(models.ContratoMenor.departamentos.any(models.Departamento.id == departamento_id))
+        
     if estado_interno:
         query = query.filter(models.ContratoMenor.estado_interno == estado_interno)
 
     if sense_departament is not None:
         if sense_departament:
-            query = query.filter(models.ContratoMenor.departamento_id.is_(None))
+            query = query.filter(~models.ContratoMenor.departamentos.any())
         else:
-            query = query.filter(models.ContratoMenor.departamento_id.isnot(None))
+            query = query.filter(models.ContratoMenor.departamentos.any())
 
     total = query.count()
     contratos = query.order_by(models.ContratoMenor.data_adjudicacio.desc().nullslast()).offset(skip).limit(limit).all()
@@ -101,14 +101,14 @@ def export_menores_csv(
         from sqlalchemy import text
         query = query.filter(text("data_adjudicacio >= CURRENT_DATE - INTERVAL '1 year'"))
     if departamento_id:
-        query = query.filter(models.ContratoMenor.departamento_id == departamento_id)
+        query = query.filter(models.ContratoMenor.departamentos.any(models.Departamento.id == departamento_id))
     if estado_interno:
         query = query.filter(models.ContratoMenor.estado_interno == estado_interno)
     if sense_departament is not None:
         if sense_departament:
-            query = query.filter(models.ContratoMenor.departamento_id.is_(None))
+            query = query.filter(~models.ContratoMenor.departamentos.any())
         else:
-            query = query.filter(models.ContratoMenor.departamento_id.isnot(None))
+            query = query.filter(models.ContratoMenor.departamentos.any())
 
     contratos = query.all()
     
@@ -174,6 +174,14 @@ def update_contrato_menor(
         raise HTTPException(status_code=403, detail="No tens permissos per modificar contractes")
         
     update_data = contrato.model_dump(exclude_unset=True)
+    if 'departamentos_ids' in update_data:
+        ids = update_data.pop('departamentos_ids')
+        if ids is not None:
+            depts = db.query(models.Departamento).filter(models.Departamento.id.in_(ids)).all()
+            db_contrato.departamentos = depts
+        else:
+            db_contrato.departamentos = []
+            
     for field, value in update_data.items():
         setattr(db_contrato, field, value)
         
@@ -195,7 +203,11 @@ def asignar_masivo_menores(
     ).all()
     
     for c in contratos:
-        c.departamento_id = asignacion.departamento_id
+        if asignacion.departamentos_ids:
+            depts = db.query(models.Departamento).filter(models.Departamento.id.in_(asignacion.departamentos_ids)).all()
+            c.departamentos = depts
+        else:
+            c.departamentos = []
         
     db.commit()
     return {"message": f"{len(contratos)} contractes menors assignats correctament"}

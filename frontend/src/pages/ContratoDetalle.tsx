@@ -35,6 +35,7 @@ export default function ContratoDetalle() {
     const [prorrogues, setProrrogues] = useState<Prorroga[]>([]);
     const [modificacions, setModificacions] = useState<any[]>([]);
     const [departamentos, setDepartamentos] = useState<any[]>([]);
+    const [empleados, setEmpleados] = useState<Empleado[]>([]);
     
     // JSON Document state
     const [documentsJson, setDocumentsJson] = useState<{label: string, url: string}[]>([]);
@@ -127,10 +128,14 @@ export default function ContratoDetalle() {
                 await loadLots(parseInt(id));
             }
             try {
-                const depts = await api.getDepartamentos();
+                const [depts, emps] = await Promise.all([
+                    api.getDepartamentos(),
+                    api.getEmpleados()
+                ]);
                 setDepartamentos(depts);
+                setEmpleados(emps);
             } catch (err) {
-                console.error("Error loading departamentos:", err);
+                console.error("Error loading common data:", err);
             }
         };
         loadAllData();
@@ -201,7 +206,11 @@ export default function ContratoDetalle() {
 
     const handleOpenEdit = () => {
         if (contrato) {
-            setEditData({ ...contrato });
+            setEditData({ 
+                ...contrato, 
+                responsables_ids: contrato.responsables?.map((r) => r.id) || [],
+                departamentos_ids: contrato.departamentos?.map((d) => d.id) || []
+            } as any);
             setShowEditModal(true);
         }
     };
@@ -210,7 +219,15 @@ export default function ContratoDetalle() {
         if (!contrato || !id) return;
         try {
             setSaving(true);
-            await api.updateContrato(parseInt(id), editData);
+            const isResponsable = user?.rol === 'responsable';
+            const isAdmin = user?.rol === 'admin' || user?.rol === 'responsable_contratacion';
+            
+            let dataToSend = { ...editData };
+            if (isResponsable && !isAdmin) {
+                dataToSend = { meses_aviso_vencimiento: editData.meses_aviso_vencimiento };
+            }
+            
+            await api.updateContrato(parseInt(id), dataToSend);
             await loadContrato(parseInt(id));
             setShowEditModal(false);
         } catch (err) {
@@ -323,7 +340,7 @@ export default function ContratoDetalle() {
                             Veure Publicació
                         </a>
                     )}
-                {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
+                {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable') && (
                     <button onClick={handleOpenEdit} className="btn btn-primary gap-2">
                         <Edit size={18} />
                         Editar
@@ -999,20 +1016,27 @@ export default function ContratoDetalle() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Departament Asignat</label>
-                                        <select 
-                                            className="input input-bordered w-full" 
-                                            value={editData.departamento_id || ""} 
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                setEditData({ ...editData, departamento_id: val ? parseInt(val) : undefined });
-                                            }}
-                                        >
-                                            <option value="">-- Sense Departament --</option>
+                                        <label className="block text-sm text-slate-600 mb-1">Departaments Assignats</label>
+                                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-lg">
                                             {departamentos.map(d => (
-                                                <option key={d.id} value={d.id}>{d.nombre}</option>
+                                                <label key={d.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                        checked={(editData as any).departamentos_ids?.includes(d.id)}
+                                                        onChange={(e) => {
+                                                            const currentIds = (editData as any).departamentos_ids || [];
+                                                            if (e.target.checked) {
+                                                                setEditData({ ...editData, departamentos_ids: [...currentIds, d.id] } as any);
+                                                            } else {
+                                                                setEditData({ ...editData, departamentos_ids: currentIds.filter((id: number) => id !== d.id) } as any);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm font-medium text-slate-700">{d.nombre}</span>
+                                                </label>
                                             ))}
-                                        </select>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm text-slate-600 mb-1">Lots</label>
@@ -1049,6 +1073,65 @@ export default function ContratoDetalle() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Responsables i Avisos */}
+                            {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable') && (
+                                <div>
+                                    <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
+                                        <AlertCircle size={18} className="text-primary-600" />
+                                        Avisos i Responsables
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Mesos d'avís abans de venciment
+                                            </label>
+                                            <p className="text-xs text-slate-500 mb-2">Per defecte són 3 mesos des de configuració.</p>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                className="input input-bordered w-full"
+                                                placeholder="Deixa-ho en blanc per usar l'avís per defecte"
+                                                value={editData.meses_aviso_vencimiento || ""}
+                                                onChange={(e) => setEditData({ ...editData, meses_aviso_vencimiento: e.target.value ? parseInt(e.target.value) : undefined })}
+                                            />
+                                        </div>
+                                        {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Responsables assignats
+                                                </label>
+                                                <p className="text-xs text-slate-500 mb-2">Usuaris que rebran l'avís i podran gestionar-lo.</p>
+                                                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-lg">
+                                                    {empleados.map(emp => (
+                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                                checked={(editData as any).responsables_ids?.includes(emp.id)}
+                                                                onChange={(e) => {
+                                                                    const currentIds = (editData as any).responsables_ids || [];
+                                                                    if (e.target.checked) {
+                                                                        setEditData({ ...editData, responsables_ids: [...currentIds, emp.id] } as any);
+                                                                    } else {
+                                                                        setEditData({ ...editData, responsables_ids: currentIds.filter((id: number) => id !== emp.id) } as any);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="text-sm font-medium text-slate-700">{emp.nombre}</span>
+                                                            <span className="text-xs text-slate-400">({emp.email})</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
+                            <>
                             <div>
                                 <h4 className="font-medium text-slate-700 mb-3">Adjudicatari</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1250,6 +1333,9 @@ export default function ContratoDetalle() {
                                     </div>
                                 </div>
                             </div>
+                            </>
+                            )}
+
                         </div>
 
                         <div className="flex gap-3 pt-6 mt-6 border-t border-slate-100">

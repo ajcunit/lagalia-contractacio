@@ -45,6 +45,8 @@ def get_config(clave: str, db: Session = Depends(get_db)):
             return {"id": 0, "clave": "ldap_user_domain", "valor": "", "descripcion": "Domini d'usuari (ex: @empresa.local)", "updated_at": None}
         if clave == "ldap_enabled":
             return {"id": 0, "clave": "ldap_enabled", "valor": "false", "descripcion": "Activa l'autenticació LDAP", "updated_at": None}
+        if clave == "dashboard_mesos_caducitat":
+            return {"id": 0, "clave": "dashboard_mesos_caducitat", "valor": "3", "descripcion": "Mesos d'avís per venciment de contracte per defecte", "updated_at": None}
         
         raise HTTPException(status_code=404, detail="Configuració no trobada")
     return cfg
@@ -70,6 +72,11 @@ def update_config(
             cfg.descripcion = cfg_update.descripcion
             
     db.commit()
+    
+    if clave == 'dashboard_mesos_caducitat':
+        import services.alerta_service as alerta_service
+        alerta_service.update_and_notify_expirations(db)
+        
     db.refresh(cfg)
     return cfg
 

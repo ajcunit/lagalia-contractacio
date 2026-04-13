@@ -1,8 +1,32 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, CheckConstraint, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, CheckConstraint, UniqueConstraint, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
 
+
+contrato_responsables = Table(
+    'contrato_responsables', Base.metadata,
+    Column('contrato_id', Integer, ForeignKey('contratos.id', ondelete='CASCADE'), primary_key=True),
+    Column('empleado_id', Integer, ForeignKey('empleados.id', ondelete='CASCADE'), primary_key=True)
+)
+
+empleado_departamentos = Table(
+    'empleado_departamentos', Base.metadata,
+    Column('empleado_id', Integer, ForeignKey('empleados.id', ondelete='CASCADE'), primary_key=True),
+    Column('departamento_id', Integer, ForeignKey('departamentos.id', ondelete='CASCADE'), primary_key=True)
+)
+
+contrato_departamentos = Table(
+    'contrato_departamentos', Base.metadata,
+    Column('contrato_id', Integer, ForeignKey('contratos.id', ondelete='CASCADE'), primary_key=True),
+    Column('departamento_id', Integer, ForeignKey('departamentos.id', ondelete='CASCADE'), primary_key=True)
+)
+
+contrato_menor_departamentos = Table(
+    'contrato_menor_departamentos', Base.metadata,
+    Column('contrato_menor_id', Integer, ForeignKey('contratos_menores.id', ondelete='CASCADE'), primary_key=True),
+    Column('departamento_id', Integer, ForeignKey('departamentos.id', ondelete='CASCADE'), primary_key=True)
+)
 
 class Departamento(Base):
     __tablename__ = "departamentos"
@@ -14,8 +38,9 @@ class Departamento(Base):
     activo = Column(Boolean, default=True)
     fecha_creacion = Column(DateTime, server_default=func.now())
 
-    empleados = relationship("Empleado", back_populates="departamento")
-    contratos = relationship("Contrato", back_populates="departamento")
+    empleados = relationship("Empleado", secondary=empleado_departamentos, back_populates="departamentos")
+    contratos = relationship("Contrato", secondary=contrato_departamentos, back_populates="departamentos")
+    contratos_menores = relationship("ContratoMenor", secondary=contrato_menor_departamentos, back_populates="departamentos")
     reglas_asociacion = relationship("ReglaAsociacion", back_populates="departamento")
 
 
@@ -25,7 +50,6 @@ class Empleado(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
-    departamento_id = Column(Integer, ForeignKey("departamentos.id"))
     rol = Column(String(50))
     activo = Column(Boolean, default=True)
     hashed_password = Column(String(255), nullable=True) # Per autenticació JWT
@@ -37,7 +61,7 @@ class Empleado(Base):
         CheckConstraint(rol.in_(['responsable', 'empleado', 'admin', 'responsable_contratacion']), name='check_rol'),
     )
 
-    departamento = relationship("Departamento", back_populates="empleados")
+    departamentos = relationship("Departamento", secondary=empleado_departamentos, back_populates="empleados")
     duplicados_validados = relationship("Duplicado", back_populates="usuario_validador")
     historial_cambios = relationship("HistorialContrato", back_populates="usuario")
 
@@ -90,6 +114,8 @@ class Contrato(Base):
     data_finalitzacio_calculada = Column(Date, index=True)  # Data formalització + durada
     alerta_finalitzacio = Column(Boolean, default=False)  # True si acaba en 6 mesos
     possiblement_finalitzat = Column(Boolean, default=False)  # True si ja ha passat la data
+    meses_aviso_vencimiento = Column(Integer, nullable=True) # Avis individual en mesos
+    
     
     # Fechas de anuncios
     data_anunci_previ = Column(Date)
@@ -131,7 +157,6 @@ class Contrato(Base):
 
 
     # Control interno
-    departamento_id = Column(Integer, ForeignKey("departamentos.id"))
     estado_interno = Column(String(50), default='normal', index=True)
     datos_json = Column(JSON)
     hash_contenido = Column(String(32), index=True)
@@ -143,12 +168,13 @@ class Contrato(Base):
         UniqueConstraint('codi_expedient', 'estat_actual', 'lots', name='unique_expediente_estado_lot'),
     )
 
-    departamento = relationship("Departamento", back_populates="contratos")
+    departamentos = relationship("Departamento", secondary=contrato_departamentos, back_populates="contratos")
     duplicados_1 = relationship("Duplicado", foreign_keys="Duplicado.contrato_id_1", back_populates="contrato_1")
     duplicados_2 = relationship("Duplicado", foreign_keys="Duplicado.contrato_id_2", back_populates="contrato_2")
     historial = relationship("HistorialContrato", back_populates="contrato")
     prorrogues = relationship("Prorroga", back_populates="contrato", order_by="Prorroga.numero_prorroga")
     modificacions = relationship("Modificacion", back_populates="contrato", order_by="Modificacion.numero_modificacio")
+    responsables = relationship("Empleado", secondary=contrato_responsables, backref="contratos_asignados")
 
     @property
     def num_prorrogues(self) -> int:
@@ -316,14 +342,13 @@ class ContratoMenor(Base):
     datos_json_liquidacio = Column(JSON)
     
     # Control interno
-    departamento_id = Column(Integer, ForeignKey("departamentos.id"))
     estado_interno = Column(String(50), default='normal', index=True)
     
     __table_args__ = (
         CheckConstraint(estado_interno.in_(['normal', 'pendiente_aprobacion', 'aprobado', 'rechazado']), name='check_estado_interno_menores'),
     )
-    
-    departamento = relationship("Departamento")
+
+    departamentos = relationship("Departamento", secondary=contrato_menor_departamentos, back_populates="contratos_menores")
 
 
 class Configuracion(Base):

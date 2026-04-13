@@ -11,7 +11,7 @@ export default function ContratoMenorDetalle() {
     const [user, setUser] = useState<Empleado | null>(null);
     const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
     const [isEditing, setIsEditing] = useState(false);
-    const [editState, setEditState] = useState<{ departamento_id?: number | null }>({});
+    const [editState, setEditState] = useState<{ departamentos_ids: number[] }>({ departamentos_ids: [] });
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -36,7 +36,7 @@ export default function ContratoMenorDetalle() {
                 setLoading(true);
                 const data = await api.getContratoMenor(parseInt(id));
                 setContrato(data);
-                setEditState({ departamento_id: data.departamento_id });
+                setEditState({ departamentos_ids: data.departamentos?.map(d => d.id) || [] });
             } catch (err) {
                 console.error('Error loading contrato menor:', err);
             } finally {
@@ -52,7 +52,7 @@ export default function ContratoMenorDetalle() {
         try {
             setLoading(true);
             const updated = await api.updateContratoMenor(parseInt(id), {
-                departamento_id: editState.departamento_id === 0 ? null : editState.departamento_id
+                departamentos_ids: editState.departamentos_ids
             });
             setContrato(updated);
             setIsEditing(false);
@@ -196,16 +196,25 @@ export default function ContratoMenorDetalle() {
                                 <label className="text-xs font-semibold text-slate-500 mb-1 block uppercase tracking-wider">Departament Assignat</label>
                                 {isEditing ? (
                                     <div className="space-y-3">
-                                        <select 
-                                            className="input w-full"
-                                            value={editState.departamento_id || 0}
-                                            onChange={(e) => setEditState({ ...editState, departamento_id: parseInt(e.target.value) || null })}
-                                        >
-                                            <option value={0}>Sense assignar</option>
+                                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-slate-50 border rounded-lg">
                                             {departamentos.map(d => (
-                                                <option key={d.id} value={d.id}>{d.nombre}</option>
+                                                <label key={d.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-white rounded transition-colors">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                        checked={editState.departamentos_ids.includes(d.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setEditState({ ...editState, departamentos_ids: [...editState.departamentos_ids, d.id] });
+                                                            } else {
+                                                                setEditState({ ...editState, departamentos_ids: editState.departamentos_ids.filter(id => id !== d.id) });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-xs font-semibold text-slate-700">{d.nombre}</span>
+                                                </label>
                                             ))}
-                                        </select>
+                                        </div>
                                         <div className="flex gap-2">
                                             <button 
                                                 onClick={handleSave}
@@ -216,7 +225,7 @@ export default function ContratoMenorDetalle() {
                                             <button 
                                                 onClick={() => {
                                                     setIsEditing(false);
-                                                    setEditState({ departamento_id: contrato.departamento_id });
+                                                    setEditState({ departamentos_ids: contrato.departamentos?.map(d => d.id) || [] });
                                                 }}
                                                 className="btn btn-secondary flex-1 py-1 px-2 text-sm flex items-center justify-center gap-1"
                                             >
@@ -225,13 +234,21 @@ export default function ContratoMenorDetalle() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                            <Layers size={16} />
-                                        </div>
-                                        <span className="font-semibold text-slate-800">
-                                            {departamentos.find(d => d.id === contrato.departamento_id)?.nombre || 'Sense assignar'}
-                                        </span>
+                                    <div className="mt-1 space-y-2">
+                                        {contrato.departamentos && contrato.departamentos.length > 0 ? (
+                                            contrato.departamentos.map(d => (
+                                                <div key={d.id} className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                                        <Layers size={12} />
+                                                    </div>
+                                                    <span className="font-semibold text-slate-800 text-sm">
+                                                        {d.nombre}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <span className="text-slate-400 italic text-sm">Sense assignar</span>
+                                        )}
                                     </div>
                                 )}
                             </div>

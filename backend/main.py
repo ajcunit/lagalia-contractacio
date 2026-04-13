@@ -55,6 +55,12 @@ def run_migrations():
         "ALTER TABLE empleados ADD COLUMN IF NOT EXISTS permiso_pla_contractacio BOOLEAN DEFAULT FALSE",
         "ALTER TABLE pla_contractacio_entrades ADD COLUMN IF NOT EXISTS estat VARCHAR(50) DEFAULT 'aprovat'",
         "ALTER TABLE pla_contractacio_entrades ADD COLUMN IF NOT EXISTS departamento_id INTEGER REFERENCES departamentos(id)",
+        "ALTER TABLE contratos ADD COLUMN IF NOT EXISTS meses_aviso_vencimiento INTEGER NULL",
+        """CREATE TABLE IF NOT EXISTS contrato_responsables (
+            contrato_id INTEGER NOT NULL REFERENCES contratos(id) ON DELETE CASCADE,
+            empleado_id INTEGER NOT NULL REFERENCES empleados(id) ON DELETE CASCADE,
+            PRIMARY KEY (contrato_id, empleado_id)
+        )""",
     ]
     with engine.connect() as conn:
         for sql in migrations:

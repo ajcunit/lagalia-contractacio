@@ -32,7 +32,7 @@ export default function EmpleadoDetalle() {
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
-        departamento_id: '',
+        departamentos_ids: [] as number[],
         rol: 'empleado',
         password: '',
         activo: true,
@@ -74,7 +74,7 @@ export default function EmpleadoDetalle() {
             setFormData({
                 nombre: emp.nombre,
                 email: emp.email,
-                departamento_id: emp.departamento_id?.toString() || '',
+                departamentos_ids: emp.departamentos?.map((d) => d.id) || [],
                 rol: emp.rol,
                 password: '',
                 activo: emp.activo,
@@ -99,7 +99,7 @@ export default function EmpleadoDetalle() {
             const data = {
                 nombre: formData.nombre,
                 email: formData.email,
-                departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : undefined,
+                departamentos_ids: formData.departamentos_ids.length > 0 ? formData.departamentos_ids : undefined,
                 rol: formData.rol,
                 password: formData.password || undefined,
                 activo: formData.activo,
@@ -296,17 +296,26 @@ export default function EmpleadoDetalle() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Departament</label>
-                                        <select 
-                                            className="input"
-                                            value={formData.departamento_id}
-                                            onChange={(e) => setFormData({...formData, departamento_id: e.target.value})}
-                                        >
-                                            <option value="">Sense asignar</option>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Departaments Assignats</label>
+                                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-lg">
                                             {departamentos.map(d => (
-                                                <option key={d.id} value={d.id}>{d.nombre}</option>
+                                                <label key={d.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                        checked={formData.departamentos_ids.includes(d.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setFormData({...formData, departamentos_ids: [...formData.departamentos_ids, d.id]});
+                                                            } else {
+                                                                setFormData({...formData, departamentos_ids: formData.departamentos_ids.filter(id => id !== d.id)});
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm font-medium text-slate-700">{d.nombre}</span>
+                                                </label>
                                             ))}
-                                        </select>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Rol de l'usuari</label>
@@ -434,9 +443,11 @@ export default function EmpleadoDetalle() {
                                             <Building2 size={20} />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Departament</label>
+                                            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Departaments</label>
                                             <p className="text-slate-800 font-medium">
-                                                {empleado?.departamento?.nombre || 'Sense departament assignat'}
+                                                {empleado?.departamentos && empleado.departamentos.length > 0
+                                                    ? empleado.departamentos.map(d => d.nombre).join(', ')
+                                                    : 'Sense departament assignat'}
                                             </p>
                                         </div>
                                     </div>

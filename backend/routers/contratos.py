@@ -225,7 +225,7 @@ def get_dashboard_stats(
         for adj, count, vol in top_adj
     ]
     
-    # Contratos próximos a finalizar (en 6 meses)
+    # Contratos próximos a finalizar
     contratos_proximos = base_query.filter(
         models.Contrato.alerta_finalitzacio == True
     ).count()
@@ -236,11 +236,11 @@ def get_dashboard_stats(
     ).count()
     
     # Contratos por departamento
-    dept_query = base_query.join(
-        models.Departamento, models.Contrato.departamento_id == models.Departamento.id, isouter=True
+    dept_query = base_query.outerjoin(
+        models.Contrato.departamentos
     ).with_entities(
         func.coalesce(models.Departamento.nombre, 'No assignat').label('departamento'),
-        func.count(models.Contrato.id).label('contratos'),
+        func.count(models.Contrato.id.distinct()).label('contratos'),
         func.sum(models.Contrato.import_adjudicacio_amb_iva).label('volumen')
     ).group_by(
         'departamento'
@@ -477,11 +477,58 @@ def update_contrato(
     if not db_contrato:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
     
-    # Permission check: Only admin and responsable_contratacion can update contracts
-    if current_user.rol not in ["admin", "responsable_contratacion"]:
+    # Permission check: Only admin and responsable_contratacion can update contracts generally
+    # 'responsable' can only update meses_aviso_vencimiento
+    is_admin = current_user.rol in ["admin", "responsable_contratacion"]
+    is_responsable = current_user.rol == "responsable"
+    
+    if not is_admin and not is_responsable:
         raise HTTPException(status_code=403, detail="No tens permissos per modificar contractes")
     
     update_data = contrato.model_dump(exclude_unset=True)
+    
+    if "departamentos_ids" in update_data:
+        dept_ids = update_data.pop("departamentos_ids")
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Només els administradors poden assignar departaments")
+        if dept_ids is not None:
+            depts = db.query(models.Departamento).filter(models.Departamento.id.in_(dept_ids)).all()
+            old_dept_ids = [d.id for d in db_contrato.departamentos]
+            db_contrato.departamentos = depts
+            
+            historial = models.HistorialContrato(
+                contrato_id=contrato_id,
+                campo_modificado='departamentos',
+                valor_anterior=str(old_dept_ids),
+                valor_nuevo=str(dept_ids),
+                tipo_cambio='manual',
+                usuario_id=current_user.id
+            )
+            db.add(historial)
+    
+    if is_responsable and not is_admin:
+        allowed_keys = {"meses_aviso_vencimiento"}
+        if not set(update_data.keys()).issubset(allowed_keys):
+            raise HTTPException(status_code=403, detail="Només pots modificar els mesos d'avís de venciment")
+            
+    if "responsables_ids" in update_data:
+        resp_ids = update_data.pop("responsables_ids")
+        if not is_admin:
+            raise HTTPException(status_code=403, detail="Només els administradors poden assignar responsables")
+        
+        nuevos_responsables = db.query(models.Empleado).filter(models.Empleado.id.in_(resp_ids)).all()
+        old_ids = [r.id for r in db_contrato.responsables]
+        db_contrato.responsables = nuevos_responsables
+        
+        historial = models.HistorialContrato(
+            contrato_id=contrato_id,
+            campo_modificado='responsables',
+            valor_anterior=str(old_ids),
+            valor_nuevo=str(resp_ids),
+            tipo_cambio='manual',
+            usuario_id=current_user.id
+        )
+        db.add(historial)
     
     # Log changes
     for field, value in update_data.items():
@@ -498,6 +545,11 @@ def update_contrato(
             db.add(historial)
         setattr(db_contrato, field, value)
     db.commit()
+    
+    # Recalculate alerts in case meses_aviso_vencimiento changed
+    import services.alerta_service as alerta_service
+    alerta_service.update_and_notify_expirations(db)
+    
     db.refresh(db_contrato)
     return db_contrato
 
@@ -516,18 +568,19 @@ def asignar_masivo(
     ).all()
     
     for c in contratos:
-        old_value = c.departamento_id
-        if old_value != asignacion.departamento_id:
+        old_value = [d.id for d in c.departamentos]
+        if asignacion.departamentos_ids is not None and sorted(old_value) != sorted(asignacion.departamentos_ids):
             historial = models.HistorialContrato(
                 contrato_id=c.id,
-                campo_modificado='departamento_id',
-                valor_anterior=str(old_value) if old_value is not None else None,
-                valor_nuevo=str(asignacion.departamento_id) if asignacion.departamento_id is not None else None,
+                campo_modificado='departamentos',
+                valor_anterior=str(old_value),
+                valor_nuevo=str(asignacion.departamentos_ids),
                 tipo_cambio='manual',
                 usuario_id=current_user.id
             )
             db.add(historial)
-            c.departamento_id = asignacion.departamento_id
+            depts = db.query(models.Departamento).filter(models.Departamento.id.in_(asignacion.departamentos_ids)).all()
+            c.departamentos = depts
         
     db.commit()
     return {"message": f"{len(contratos)} contractes assignats correctament"}

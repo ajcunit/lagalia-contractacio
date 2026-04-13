@@ -22,7 +22,7 @@ def list_empleados(
     if activo is not None:
         query = query.filter(models.Empleado.activo == activo)
     if departamento_id is not None:
-        query = query.filter(models.Empleado.departamento_id == departamento_id)
+        query = query.filter(models.Empleado.departamentos.any(id=departamento_id))
     if rol is not None:
         query = query.filter(models.Empleado.rol == rol)
     return query.offset(skip).limit(limit).all()
@@ -49,18 +49,19 @@ def create_empleado(
     if existing:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
-    # Check if departamento exists
-    if empleado.departamento_id:
-        dept = db.query(models.Departamento).filter(models.Departamento.id == empleado.departamento_id).first()
-        if not dept:
-            raise HTTPException(status_code=404, detail="Departamento no encontrado")
-    
     emp_data = empleado.model_dump()
     password = emp_data.pop("password", None)
+    dept_ids = emp_data.pop("departamentos_ids", [])
+    
     if password:
         emp_data["hashed_password"] = AuthService.get_password_hash(password)
         
     db_emp = models.Empleado(**emp_data)
+    
+    if dept_ids:
+        depts = db.query(models.Departamento).filter(models.Departamento.id.in_(dept_ids)).all()
+        db_emp.departamentos = depts
+        
     db.add(db_emp)
     db.commit()
     db.refresh(db_emp)
@@ -82,11 +83,12 @@ def update_empleado(
     
     update_data = empleado.model_dump(exclude_unset=True)
     
-    # Check if new departamento exists
-    if "departamento_id" in update_data and update_data["departamento_id"]:
-        dept = db.query(models.Departamento).filter(models.Departamento.id == update_data["departamento_id"]).first()
-        if not dept:
-            raise HTTPException(status_code=404, detail="Departamento no encontrado")
+    # Handle departamentos update
+    if "departamentos_ids" in update_data:
+        dept_ids = update_data.pop("departamentos_ids")
+        if dept_ids is not None:
+            depts = db.query(models.Departamento).filter(models.Departamento.id.in_(dept_ids)).all()
+            db_emp.departamentos = depts
             
     # Handle password update
     if "password" in update_data:

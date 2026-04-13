@@ -103,7 +103,7 @@ export default function PlaContractacio() {
             ...EMPTY_FORM, 
             any_exercici: year, 
             trimestre,
-            departamento_id: (user?.rol === 'admin' || user?.rol === 'responsable_contratacion') ? undefined : user?.departamento_id
+            departamento_id: (user?.rol === 'admin' || user?.rol === 'responsable_contratacion') ? undefined : user?.departamentos?.[0]?.id
         });
         setContratoSearch({ query: '', results: [], loading: false, selected: undefined });
         setModal({ open: true, mode: 'create', trimestre });

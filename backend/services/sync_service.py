@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from core.database import SessionLocal
 import models
+import services.alerta_service as alerta_service
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +338,9 @@ class SyncService:
                         contrato = models.Contrato(**mapped_data)
                         dept_id = SyncService.apply_association_rules(db, contrato)
                         if dept_id:
-                            contrato.departamento_id = dept_id
+                            dept = db.query(models.Departamento).filter(models.Departamento.id == dept_id).first()
+                            if dept:
+                                contrato.departamentos = [dept]
 
                         db.add(contrato)
                         db.commit()
@@ -383,6 +386,9 @@ class SyncService:
                     
             yield f'data: {json.dumps({"msg": "Sincronitzant pròrrogues i dades addicionals...", "progress": 90})}\n\n'
             SyncService.sync_prorrogues(db, codi_ine10)
+            
+            yield f'data: {json.dumps({"msg": "Calculant alertes de venciment...", "progress": 95})}\n\n'
+            alerta_service.update_and_notify_expirations(db)
             
             yield f'data: {json.dumps({"msg": "Finalitzant...", "progress": 98})}\n\n'
             
@@ -458,6 +464,11 @@ class SyncService:
                     if not existing:
                         # New contract
                         contrato = models.Contrato(**mapped_data)
+                        dept_id = SyncService.apply_association_rules(db, contrato)
+                        if dept_id:
+                            dept = db.query(models.Departamento).filter(models.Departamento.id == dept_id).first()
+                            if dept:
+                                contrato.departamentos = [dept]
                         db.add(contrato)
                         db.commit()  # Commit immediately
                         nuevos += 1
@@ -480,6 +491,9 @@ class SyncService:
             sync.registros_actualizados = actualizados
             sync.registros_sin_cambios = sin_cambios
             sync.estado = 'exitosa' if not errores else 'parcial'
+            
+            # Recalculate alerts
+            alerta_service.update_and_notify_expirations(db)
             
             # Guardem com a JSON per consistència amb la versió stream
             log_data = {
