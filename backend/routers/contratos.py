@@ -40,18 +40,6 @@ def list_contratos(
     query = db.query(models.Contrato)
     query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
     
-    # Subquery: pick one representative contract per codi_expedient (lowest id) among those visible to user
-    subquery_base = db.query(models.Contrato)
-    subquery_base = apply_department_filter(subquery_base, models.Contrato, current_user, x_view_mode)
-    
-    representative_ids = subquery_base.with_entities(
-        func.min(models.Contrato.id).label('min_id')
-    ).group_by(models.Contrato.codi_expedient).subquery()
-    
-    query = query.filter(models.Contrato.id.in_(
-        db.query(representative_ids.c.min_id)
-    ))
-    
     if estat_actual:
         if estat_actual == "Sin estado":
             query = query.filter(or_(models.Contrato.estat_actual == None, models.Contrato.estat_actual == ""))
@@ -74,7 +62,7 @@ def list_contratos(
     if cpv_principal_codi:
         query = query.filter(models.Contrato.cpv_principal_codi == cpv_principal_codi)
     if departamento_id:
-        query = query.filter(models.Contrato.departamento_id == departamento_id)
+        query = query.filter(models.Contrato.departamentos.any(models.Departamento.id == departamento_id))
     if estado_interno:
         query = query.filter(models.Contrato.estado_interno == estado_interno)
     if te_prorroga is not None:
@@ -88,9 +76,9 @@ def list_contratos(
         query = query.filter(models.Contrato.possiblement_finalitzat == possiblement_finalitzat)
     if sense_departament is not None:
         if sense_departament:
-            query = query.filter(models.Contrato.departamento_id.is_(None))
+            query = query.filter(~models.Contrato.departamentos.any())
         else:
-            query = query.filter(models.Contrato.departamento_id.isnot(None))
+            query = query.filter(models.Contrato.departamentos.any())
     if busqueda:
         search_term = f"%{busqueda}%"
         query = query.filter(
@@ -100,8 +88,16 @@ def list_contratos(
                 models.Contrato.adjudicatari_nom.ilike(search_term)
             )
         )
+
+    # Pick one representative contract per codi_expedient (lowest id) among those matching filters
+    representative_ids = query.with_entities(
+        func.min(models.Contrato.id).label('min_id')
+    ).group_by(models.Contrato.codi_expedient).subquery()
     
-    results = query.order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()
+    # Final results come from filtering the main query for these IDs
+    results = db.query(models.Contrato).filter(models.Contrato.id.in_(
+        db.query(representative_ids.c.min_id)
+    )).order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()
     
     if not results:
         return []
@@ -236,23 +232,36 @@ def get_dashboard_stats(
     ).count()
     
     # Contratos por departamento
+    # Use a subquery approach to avoid double-counting amounts
+    # when a contract belongs to multiple departments
+    from sqlalchemy import case, literal_column
+    
+    # Get all contracts with their departments via the M2M relationship
     dept_query = base_query.outerjoin(
         models.Contrato.departamentos
     ).with_entities(
         func.coalesce(models.Departamento.nombre, 'No assignat').label('departamento'),
-        func.count(models.Contrato.id.distinct()).label('contratos'),
-        func.sum(models.Contrato.import_adjudicacio_amb_iva).label('volumen')
-    ).group_by(
-        'departamento'
+        models.Contrato.id,
+        models.Contrato.import_adjudicacio_amb_iva
     ).all()
+    
+    # Aggregate manually to avoid SUM double-counting
+    dept_stats = {}
+    for dept_name, contrato_id, importe in dept_query:
+        dept_key = str(dept_name)
+        if dept_key not in dept_stats:
+            dept_stats[dept_key] = {"ids": set(), "volumen": 0.0}
+        if contrato_id not in dept_stats[dept_key]["ids"]:
+            dept_stats[dept_key]["ids"].add(contrato_id)
+            dept_stats[dept_key]["volumen"] += float(importe or 0)
     
     contratos_por_departamento = [
         {
-            "departamento": str(d.departamento),
-            "contratos": d.contratos,
-            "volumen": float(d.volumen or 0)
+            "departamento": dept_name,
+            "contratos": len(stats["ids"]),
+            "volumen": stats["volumen"]
         }
-        for d in dept_query
+        for dept_name, stats in dept_stats.items()
     ]
     
     # Contratos Menores
@@ -387,7 +396,7 @@ def export_contratos_csv(
     if adjudicatari_nom:
         query = query.filter(models.Contrato.adjudicatari_nom.ilike(f"%{adjudicatari_nom}%"))
     if departamento_id:
-        query = query.filter(models.Contrato.departamento_id == departamento_id)
+        query = query.filter(models.Contrato.departamentos.any(models.Departamento.id == departamento_id))
     if alerta_finalitzacio is not None:
         query = query.filter(models.Contrato.alerta_finalitzacio == alerta_finalitzacio)
     if possiblement_finalitzat is not None:
@@ -396,9 +405,9 @@ def export_contratos_csv(
         query = query.filter(models.Contrato.te_prorroga == te_prorroga)
     if sense_departament is not None:
         if sense_departament:
-            query = query.filter(models.Contrato.departamento_id.is_(None))
+            query = query.filter(~models.Contrato.departamentos.any())
         else:
-            query = query.filter(models.Contrato.departamento_id.isnot(None))
+            query = query.filter(models.Contrato.departamentos.any())
     
     if fecha_inicio_desde:
         query = query.filter(models.Contrato.data_inici >= fecha_inicio_desde)

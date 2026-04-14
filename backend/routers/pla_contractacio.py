@@ -57,10 +57,11 @@ def get_pla_contractacio(
     
     # Filter by department if not admin/responsable
     if current_user.rol not in ['admin', 'responsable_contratacion']:
-        if current_user.departamento_id:
-            entrades_query = entrades_query.filter(models.PlaContractacioEntrada.departamento_id == current_user.departamento_id)
+        dept_ids = [d.id for d in current_user.departamentos]
+        if dept_ids:
+            entrades_query = entrades_query.filter(models.PlaContractacioEntrada.departamento_id.in_(dept_ids))
         else:
-            # If no department, they shouldn't see anything or only their own
+            # Si no té departaments, només veu el que ha creat ell mateix
             entrades_query = entrades_query.filter(models.PlaContractacioEntrada.creat_per_id == current_user.id)
 
     entrades = entrades_query.order_by(

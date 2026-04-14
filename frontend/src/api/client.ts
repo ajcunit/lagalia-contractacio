@@ -413,7 +413,8 @@ class ApiClient {
 
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
-            throw new Error(error.detail || `Error HTTP: ${response.status}`);
+            const msg = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail || error);
+            throw new Error(msg || `Error HTTP: ${response.status}`);
         }
         return response.json();
     }
@@ -584,7 +585,7 @@ class ApiClient {
         return this.request<Record<string, string>>(`/contratos/cpv-info?codes=${query}`);
     }
 
-    async updateContrato(id: number, data: { departamentos_ids?: number[] | null; estado_interno?: string; meses_aviso_vencimiento?: number | null; responsables_ids?: number[] }): Promise<Contrato> {
+    async updateContrato(id: number, data: any): Promise<Contrato> {
         return this.request<Contrato>(`/contratos/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),

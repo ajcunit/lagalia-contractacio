@@ -38,21 +38,29 @@ def get_adjudicatarios(
 
     admin_roles = ['admin', 'responsable_contratacion']
     dept_filter = ""
+    dept_ids = [d.id for d in current_user.departamentos]
+    dept_filter_major = ""
+    dept_filter_menor = ""
     if current_user.rol not in admin_roles or x_view_mode != 'admin':
-        dept_id = current_user.departamento_id if current_user.departamento_id else -1
-        dept_filter = f" AND departamento_id = {dept_id}"
+        if not dept_ids:
+            dept_filter_major = " AND 1=0 "
+            dept_filter_menor = " AND 1=0 "
+        else:
+            ids_str = ",".join(map(str, dept_ids))
+            dept_filter_major = f" AND EXISTS (SELECT 1 FROM contrato_departamentos WHERE contrato_id = contratos.id AND departamento_id IN ({ids_str}))"
+            dept_filter_menor = f" AND EXISTS (SELECT 1 FROM contrato_menor_departamentos WHERE contrato_menor_id = contratos_menores.id AND departamento_id IN ({ids_str}))"
 
     query = f"""
     WITH combined AS (
         SELECT adjudicatari_nom as nombre, import_adjudicacio_amb_iva as importe, adjudicatari_nif as nif
         FROM contratos
-        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter}
+        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter_major}
         
         UNION ALL
         
         SELECT adjudicatari as nombre, import_adjudicacio as importe, NULL as nif
         FROM contratos_menores
-        WHERE adjudicatari IS NOT NULL AND adjudicatari != '' {dept_filter}
+        WHERE adjudicatari IS NOT NULL AND adjudicatari != '' {dept_filter_menor}
     ),
     grouped AS (
         SELECT 
@@ -77,13 +85,13 @@ def get_adjudicatarios(
     WITH combined AS (
         SELECT adjudicatari_nom as nombre
         FROM contratos
-        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter}
+        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter_major}
         
         UNION
         
         SELECT adjudicatari as nombre
         FROM contratos_menores
-        WHERE adjudicatari IS NOT NULL AND adjudicatari != '' {dept_filter}
+        WHERE adjudicatari IS NOT NULL AND adjudicatari != '' {dept_filter_menor}
     )
     SELECT COUNT(*) as total FROM combined
     {search_filter}
@@ -117,20 +125,28 @@ def get_adjudicatario_detalle(
 
     admin_roles = ['admin', 'responsable_contratacion']
     dept_filter = ""
+    dept_ids = [d.id for d in current_user.departamentos]
+    dept_filter_major = ""
+    dept_filter_menor = ""
     if current_user.rol not in admin_roles or x_view_mode != 'admin':
-        dept_id = current_user.departamento_id if current_user.departamento_id else -1
-        dept_filter = f" AND departamento_id = {dept_id}"
+        if not dept_ids:
+            dept_filter_major = " AND 1=0 "
+            dept_filter_menor = " AND 1=0 "
+        else:
+            ids_str = ",".join(map(str, dept_ids))
+            dept_filter_major = f" AND EXISTS (SELECT 1 FROM contrato_departamentos WHERE contrato_id = contratos.id AND departamento_id IN ({ids_str}))"
+            dept_filter_menor = f" AND EXISTS (SELECT 1 FROM contrato_menor_departamentos WHERE contrato_menor_id = contratos_menores.id AND departamento_id IN ({ids_str}))"
 
     query = f"""
     SELECT id, codi_expedient, objecte_contracte as descripcion, import_adjudicacio_amb_iva as importe, 'major' as tipo_registro, data_inici as fecha, estat_actual as estado
     FROM contratos
-    WHERE adjudicatari_nom = :nombre {dept_filter}
+    WHERE adjudicatari_nom = :nombre {dept_filter_major}
     
     UNION ALL
     
     SELECT id, codi_expedient, descripcio_expedient as descripcion, import_adjudicacio as importe, 'menor' as tipo_registro, data_adjudicacio as fecha, 'Adjudicat' as estado
     FROM contratos_menores
-    WHERE adjudicatari = :nombre {dept_filter}
+    WHERE adjudicatari = :nombre {dept_filter_menor}
     
     ORDER BY fecha DESC NULLS LAST
     """

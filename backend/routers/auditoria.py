@@ -44,8 +44,9 @@ def get_posibles_fraccionamientos(
     
     # Aplicar filtre de departament de forma segura
     if current_user.rol not in ['admin', 'responsable_contratacion'] or x_view_mode != 'admin':
-        if current_user.departamento_id:
-            query = query.filter(models.ContratoMenor.departamento_id == current_user.departamento_id)
+        dept_ids = [d.id for d in current_user.departamentos]
+        if dept_ids:
+            query = query.filter(models.ContratoMenor.departamentos.any(models.Departamento.id.in_(dept_ids)))
         else:
             return []
     

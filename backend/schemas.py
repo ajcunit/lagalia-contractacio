@@ -10,6 +10,10 @@ class DepartamentoBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
 
+    model_config = {
+        "from_attributes": True
+    }
+
 
 class DepartamentoCreate(DepartamentoBase):
     pass
@@ -27,9 +31,6 @@ class Departamento(DepartamentoBase):
     activo: bool
     fecha_creacion: datetime
 
-    class Config:
-        from_attributes = True
-
 
 # Empleado Schemas
 class EmpleadoBase(BaseModel):
@@ -38,6 +39,10 @@ class EmpleadoBase(BaseModel):
     rol: str = "empleado"
     permiso_auditoria: Optional[bool] = False
     permiso_pla_contractacio: Optional[bool] = False
+
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class EmpleadoCreate(EmpleadoBase):
@@ -58,12 +63,9 @@ class EmpleadoUpdate(BaseModel):
 
 class Empleado(EmpleadoBase):
     id: int
-    departamentos: List[DepartamentoBase] = []
+    departamentos: List[Departamento] = []
     activo: bool
     fecha_creacion: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class EmpleadoConDepartamento(Empleado):
@@ -149,15 +151,16 @@ class ContratoMassAssign(BaseModel):
 
 class Contrato(ContratoBase):
     id: int
-    departamentos: List[DepartamentoBase] = []
+    departamentos: List[Departamento] = []
     estado_interno: str
     hash_contenido: Optional[str]
     fecha_primera_sincronizacion: Optional[datetime]
     fecha_ultima_sincronizacion: Optional[datetime]
     responsables: Optional[List[Empleado]] = []
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class ContratoListItem(BaseModel):
@@ -169,7 +172,7 @@ class ContratoListItem(BaseModel):
     data_inici: Optional[date]
     estat_actual: Optional[str]
     estado_interno: str
-    departamentos: List[DepartamentoBase] = []
+    departamentos: List[Departamento] = []
     data_finalitzacio_calculada: Optional[date] = None
     alerta_finalitzacio: Optional[bool] = False
     possiblement_finalitzat: Optional[bool] = False
@@ -178,8 +181,9 @@ class ContratoListItem(BaseModel):
     num_modificacions: int = 0
     num_lots: int = 1
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 # Contratos Menores Schemas

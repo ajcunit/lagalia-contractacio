@@ -94,6 +94,18 @@ app = FastAPI(
 # === Middleware ===
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"DEBUG: 422 Error at {request.url.path}")
+    print(f"DEBUG: Errors: {exc.errors()}")
+    print(f"DEBUG: Body: {await request.body()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(await request.body())},
+    )
+
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -127,6 +139,14 @@ api_app.include_router(favoritos.router, dependencies=secure_deps)
 api_app.include_router(adjudicatarios.router)
 api_app.include_router(auditoria.router, dependencies=secure_deps)
 api_app.include_router(pla_contractacio.router, dependencies=secure_deps)
+@api_app.exception_handler(RequestValidationError)
+async def api_validation_exception_handler(request, exc):
+    print(f"DEBUG API: 422 Error at {request.url.path}")
+    print(f"DEBUG API: Errors: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 # Proxy JSON SEGUR — whitelist de dominis + rate limit

@@ -29,8 +29,8 @@ export default function ContratoDetalle() {
     const [contrato, setContrato] = useState<Contrato | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editData, setEditData] = useState<Partial<Contrato>>({});
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState<Partial<Contrato & { departamentos_ids: number[], responsables_ids: number[] }>>({});
     const [saving, setSaving] = useState(false);
     const [prorrogues, setProrrogues] = useState<Prorroga[]>([]);
     const [modificacions, setModificacions] = useState<any[]>([]);
@@ -206,32 +206,94 @@ export default function ContratoDetalle() {
 
     const handleOpenEdit = () => {
         if (contrato) {
+            const dept_ids = contrato.departamentos?.map((d) => d.id) || [];
+            const resp_ids = contrato.responsables?.map((r) => r.id) || [];
+
             setEditData({ 
                 ...contrato, 
-                responsables_ids: contrato.responsables?.map((r) => r.id) || [],
-                departamentos_ids: contrato.departamentos?.map((d) => d.id) || []
-            } as any);
-            setShowEditModal(true);
+                responsables_ids: resp_ids,
+                departamentos_ids: dept_ids
+            });
+            setIsEditing(true);
         }
     };
 
+    const handleCancel = () => {
+        setIsEditing(false);
+        setEditData({});
+    };
+
     const handleSave = async () => {
-        if (!contrato || !id) return;
+        console.log("Handle Save triggered", { editData });
+        if (!contrato || !id) {
+            console.error("No contract or ID found", { contrato, id });
+            return;
+        }
         try {
             setSaving(true);
             const isResponsable = user?.rol === 'responsable';
             const isAdmin = user?.rol === 'admin' || user?.rol === 'responsable_contratacion';
             
-            let dataToSend = { ...editData };
-            if (isResponsable && !isAdmin) {
-                dataToSend = { meses_aviso_vencimiento: editData.meses_aviso_vencimiento };
+            console.log("User role:", user?.rol);
+
+            // Només enviem els camps que el backend permet actualitzar
+            let dataToSend: any = {};
+            
+            if (isAdmin) {
+                // Camps que un admin pot tocar
+                const allowedFields = [
+                    'codi_expedient', 'objecte_contracte', 'tipus_contracte', 'procediment',
+                    'estat_actual', 'adjudicatari_nom', 'adjudicatari_nif', 'adjudicatari_nacionalitat',
+                    'import_adjudicacio_amb_iva', 'data_inici', 'data_final', 'data_formalitzacio', 
+                    'estado_interno', 'departamentos_ids', 'responsables_ids', 'meses_aviso_vencimiento',
+                    'organisme_adjudicador', 'departament_adjudicador', 'tipus_tramitacio',
+                    'cpv_principal_codi', 'cpv_principal_descripcio', 'codi_nuts', 'lots', 
+                    'forma_financament', 'preu_licitar', 'preu_adjudicar', 'import_licitar_sense_iva',
+                    'pressupost_licitacio_sense_iva', 'pressupost_licitacio_amb_iva'
+                ];
+                
+                allowedFields.forEach(field => {
+                    let value = editData[field as keyof typeof editData];
+                    
+                    // Convertir strings buits a null per a camps de data o números
+                    const numericFields = [
+                        'import_adjudicacio_amb_iva', 'preu_licitar', 'preu_adjudicar', 
+                        'import_licitar_sense_iva', 'pressupost_licitacio_sense_iva', 
+                        'pressupost_licitacio_amb_iva', 'meses_aviso_vencimiento'
+                    ];
+                    const dateFields = ['data_inici', 'data_final', 'data_formalitzacio'];
+                    
+                    if ((numericFields.includes(field) || dateFields.includes(field)) && value === "") {
+                        value = undefined;
+                    }
+                    
+                    if (value !== undefined) {
+                        // Si és un array d'IDs, filtrem valors no vàlids (com nulls)
+                        if (Array.isArray(value) && (field === 'departamentos_ids' || field === 'responsables_ids')) {
+                            const filtered = value.filter(id => id !== null && id !== undefined);
+                            dataToSend[field] = Array.from(new Set(filtered));
+                        } else {
+                            dataToSend[field] = value;
+                        }
+                    }
+                });
+            } else if (isResponsable) {
+                // Un responsable només pot tocar els mesos d'avís
+                dataToSend = { 
+                    meses_aviso_vencimiento: editData.meses_aviso_vencimiento 
+                };
             }
             
+            console.log("Data to send:", dataToSend);
+            
             await api.updateContrato(parseInt(id), dataToSend);
+            console.log("Update successful");
             await loadContrato(parseInt(id));
-            setShowEditModal(false);
-        } catch (err) {
-            console.error('Error saving:', err);
+            setIsEditing(false);
+        } catch (err: any) {
+            console.error('Error saving contract:', err);
+            const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+            alert("Error al desar: " + errorMsg);
         } finally {
             setSaving(false);
         }
@@ -322,11 +384,40 @@ export default function ContratoDetalle() {
                 </button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-slate-800">{contrato.codi_expedient}</h1>
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                className="input input-bordered text-2xl font-bold h-12 w-full max-w-md" 
+                                value={editData.codi_expedient || ""} 
+                                onChange={(e) => setEditData({ ...editData, codi_expedient: e.target.value })} 
+                            />
+                        ) : (
+                            <h1 className="text-2xl font-bold text-slate-800">{contrato.codi_expedient}</h1>
+                        )}
                         {getEstadoInternoBadge(contrato.estado_interno)}
-                        <span className="badge badge-info">{contrato.estat_actual}</span>
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                className="input input-bordered h-10 w-48 text-sm" 
+                                placeholder="Estat Actual"
+                                value={editData.estat_actual || ""} 
+                                onChange={(e) => setEditData({ ...editData, estat_actual: e.target.value })} 
+                            />
+                        ) : (
+                            <span className="badge badge-info">{contrato.estat_actual}</span>
+                        )}
                     </div>
-                    <p className="text-slate-500 mt-1">{contrato.tipus_contracte}</p>
+                    {isEditing ? (
+                        <input 
+                            type="text" 
+                            className="input input-bordered h-10 w-full max-w-md text-sm mt-2" 
+                            placeholder="Tipus de Contracte"
+                            value={editData.tipus_contracte || ""} 
+                            onChange={(e) => setEditData({ ...editData, tipus_contracte: e.target.value })} 
+                        />
+                    ) : (
+                        <p className="text-slate-500 mt-1">{contrato.tipus_contracte}</p>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     {contrato.enllac_publicacio && (
@@ -341,10 +432,45 @@ export default function ContratoDetalle() {
                         </a>
                     )}
                 {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable') && (
-                    <button onClick={handleOpenEdit} className="btn btn-primary gap-2">
-                        <Edit size={18} />
-                        Editar
-                    </button>
+                    /* Header Actions */
+                    <div className="flex items-center gap-3">
+                        {isEditing ? (
+                            <>
+                                <button
+                                    onClick={handleCancel}
+                                    disabled={saving}
+                                    className="btn bg-white border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                    <X size={18} />
+                                    <span className="hidden sm:inline">Cancel·lar</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        console.log("Save button DOM click");
+                                        handleSave();
+                                    }}
+                                    disabled={saving}
+                                    className="btn btn-primary flex items-center gap-2 shadow-lg shadow-primary-200"
+                                >
+                                    {saving ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <Check size={18} />
+                                    )}
+                                    <span>{saving ? 'Desant...' : 'Desar Canvis'}</span>
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={handleOpenEdit}
+                                className="btn bg-white border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                                <Edit size={18} />
+                                <span>Editar</span>
+                            </button>
+                        )}
+                    </div>
                 )}
                 </div>
             </div>
@@ -358,7 +484,163 @@ export default function ContratoDetalle() {
                     <FileText size={20} className="text-primary-600" />
                     Objecte del Contracte
                 </h3>
-                <p className="text-slate-700 leading-relaxed">{contrato.objecte_contracte || '-'}</p>
+                {isEditing ? (
+                    <textarea
+                        className="input input-bordered w-full"
+                        rows={3}
+                        value={editData.objecte_contracte || ""}
+                        onChange={(e) => setEditData({ ...editData, objecte_contracte: e.target.value })}
+                    />
+                ) : (
+                    <p className="text-slate-700 leading-relaxed">{contrato.objecte_contracte || '-'}</p>
+                )}
+            </div>
+
+            {/* Gestió del Contracte (Inline) */}
+            <div className="glass-card p-6 border-l-4 border-l-primary-500">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                    <Users size={20} className="text-primary-600" />
+                    Gestió del Contracte
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Departaments */}
+                    <div className="md:col-span-2">
+                        <label className="text-sm font-semibold text-slate-500 mb-2 block tracking-wider uppercase text-[10px]">
+                            Departaments Assignats
+                        </label>
+                        {isEditing ? (
+                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
+                                {departamentos.map(d => {
+                                    const isChecked = editData.departamentos_ids?.some(id => Number(id) === Number(d.id)) || false;
+                                    return (
+                                        <label key={d.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    const currentIds = editData.departamentos_ids || [];
+                                                    if (e.target.checked) {
+                                                        setEditData({ ...editData, departamentos_ids: [...currentIds, d.id] });
+                                                    } else {
+                                                        setEditData({ ...editData, departamentos_ids: currentIds.filter((id: number) => id !== d.id) });
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-sm font-medium text-slate-700">{d.nombre}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {contrato.departamentos && contrato.departamentos.length > 0 ? (
+                                    contrato.departamentos.map(d => (
+                                        <span key={d.id} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-primary-50 text-primary-700 border border-primary-100">
+                                            {d.nombre}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-slate-400 italic text-sm">Sense departaments assignats</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Responsables */}
+                    <div className="md:col-span-2">
+                        <label className="text-sm font-semibold text-slate-500 mb-2 block tracking-wider uppercase text-[10px]">
+                            Responsables
+                        </label>
+                        {isEditing ? (
+                            <div className="flex flex-col gap-2 max-h-48 overflow-y-auto p-3 bg-white border border-slate-200 rounded-xl">
+                                {empleados
+                                    .filter(emp => {
+                                        if (!['responsable', 'admin', 'responsable_contratacion'].includes(emp.rol)) return false;
+                                        const selectedDeptIds = editData.departamentos_ids || [];
+                                        if (selectedDeptIds.length === 0) return false;
+                                        return emp.departamentos?.some(d => 
+                                            selectedDeptIds.some(sId => Number(sId) === Number(d.id))
+                                        );
+                                    })
+                                    .map(emp => (
+                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                                                checked={editData.responsables_ids?.some(id => Number(id) === Number(emp.id)) || false}
+                                                onChange={(e) => {
+                                                    const currentIds = editData.responsables_ids || [];
+                                                    if (e.target.checked) {
+                                                        setEditData({ ...editData, responsables_ids: [...currentIds, emp.id] });
+                                                    } else {
+                                                        setEditData({ ...editData, responsables_ids: currentIds.filter((id: number) => id !== emp.id) });
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-sm font-medium text-slate-700">{emp.nombre}</span>
+                                        </label>
+                                    ))
+                                }
+                                {(editData.departamentos_ids?.length || 0) === 0 && (
+                                    <span className="text-xs text-amber-600 italic p-2 bg-amber-50 rounded-lg font-medium">
+                                        Selecciona un departament per veure els responsables disponibles
+                                    </span>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {contrato.responsables && contrato.responsables.length > 0 ? (
+                                    contrato.responsables.map(r => (
+                                        <span key={r.id} className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-secondary-50 text-secondary-700 border border-secondary-100">
+                                            <User size={12} className="mr-1" />
+                                            {r.nombre}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-slate-400 italic text-sm">Sense responsables assignats</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Estats i Avisos */}
+                    <div className="lg:col-span-2">
+                        <label className="text-sm font-semibold text-slate-500 mb-2 block tracking-wider uppercase text-[10px]">
+                            Estat Intern
+                        </label>
+                        {isEditing ? (
+                            <select 
+                                className="input input-bordered w-full" 
+                                value={editData.estado_interno || ""} 
+                                onChange={(e) => setEditData({ ...editData, estado_interno: e.target.value })}
+                            >
+                                <option value="normal">Normal</option>
+                                <option value="pendiente_aprobacion">Pendent d'aprovació</option>
+                                <option value="aprobado">Aprovat</option>
+                                <option value="rechazado">Rebutjat</option>
+                            </select>
+                        ) : (
+                            <div>{getEstadoInternoBadge(contrato.estado_interno)}</div>
+                        )}
+                    </div>
+
+                    <div className="lg:col-span-2">
+                        <label className="text-sm font-semibold text-slate-500 mb-2 block tracking-wider uppercase text-[10px]">
+                            Mesos d'Avís Venciment
+                        </label>
+                        {isEditing ? (
+                            <input 
+                                type="number" 
+                                className="input input-bordered w-full" 
+                                value={editData.meses_aviso_vencimiento || ""} 
+                                onChange={(e) => setEditData({ ...editData, meses_aviso_vencimiento: parseInt(e.target.value) || 0 })} 
+                            />
+                        ) : (
+                            <p className="font-bold text-slate-700">{contrato.meses_aviso_vencimiento || 6} mesos</p>
+                        )}
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -371,16 +653,28 @@ export default function ContratoDetalle() {
                     <div className="space-y-4">
                         <div>
                             <label className="text-sm text-slate-500">Adjudicatari</label>
-                            <p className="font-medium text-slate-800">{contrato.adjudicatari_nom || '-'}</p>
+                            {isEditing ? (
+                                <input type="text" className="input input-bordered w-full mt-1" value={editData.adjudicatari_nom || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nom: e.target.value })} />
+                            ) : (
+                                <p className="font-medium text-slate-800">{contrato.adjudicatari_nom || '-'}</p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm text-slate-500">NIF</label>
-                                <p className="text-slate-700">{contrato.adjudicatari_nif || '-'}</p>
+                                {isEditing ? (
+                                    <input type="text" className="input input-bordered w-full mt-1" value={editData.adjudicatari_nif || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nif: e.target.value })} />
+                                ) : (
+                                    <p className="text-slate-700">{contrato.adjudicatari_nif || '-'}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Nacionalitat</label>
-                                <p className="text-slate-700">{contrato.adjudicatari_nacionalitat || '-'}</p>
+                                {isEditing ? (
+                                    <input type="text" className="input input-bordered w-full mt-1" value={editData.adjudicatari_nacionalitat || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nacionalitat: e.target.value })} />
+                                ) : (
+                                    <p className="text-slate-700">{contrato.adjudicatari_nacionalitat || '-'}</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -396,39 +690,63 @@ export default function ContratoDetalle() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-4 rounded-xl bg-slate-50">
                                 <label className="text-sm text-slate-500">Preu Licitar</label>
-                                <p className="text-xl font-bold text-slate-800 number-display">
-                                    {formatCurrency(contrato.preu_licitar)}
-                                </p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.preu_licitar || ""} onChange={(e) => setEditData({ ...editData, preu_licitar: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="text-xl font-bold text-slate-800 number-display">
+                                        {formatCurrency(contrato.preu_licitar)}
+                                    </p>
+                                )}
                             </div>
                             <div className="p-4 rounded-xl bg-green-50">
                                 <label className="text-sm text-slate-500">Preu Adjudicar</label>
-                                <p className="text-xl font-bold text-green-700 number-display">
-                                    {formatCurrency(contrato.preu_adjudicar)}
-                                </p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.preu_adjudicar || ""} onChange={(e) => setEditData({ ...editData, preu_adjudicar: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="text-xl font-bold text-green-700 number-display">
+                                        {formatCurrency(contrato.preu_adjudicar)}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm text-slate-500">Import amb IVA</label>
-                                <p className="font-medium text-slate-800">
-                                    {formatCurrency(contrato.import_adjudicacio_amb_iva)}
-                                </p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.import_adjudicacio_amb_iva || ""} onChange={(e) => setEditData({ ...editData, import_adjudicacio_amb_iva: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="font-medium text-slate-800">
+                                        {formatCurrency(contrato.import_adjudicacio_amb_iva)}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Import sense IVA</label>
-                                <p className="font-medium text-slate-800">
-                                    {formatCurrency(contrato.import_licitar_sense_iva)}
-                                </p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.import_licitar_sense_iva || ""} onChange={(e) => setEditData({ ...editData, import_licitar_sense_iva: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="font-medium text-slate-800">
+                                        {formatCurrency(contrato.import_licitar_sense_iva)}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm text-slate-500">Pressupost Licitació (sense IVA)</label>
-                                <p className="text-slate-700">{formatCurrency(contrato.pressupost_licitacio_sense_iva)}</p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.pressupost_licitacio_sense_iva || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_sense_iva: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="text-slate-700">{formatCurrency(contrato.pressupost_licitacio_sense_iva)}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Pressupost Licitació (amb IVA)</label>
-                                <p className="text-slate-700">{formatCurrency(contrato.pressupost_licitacio_amb_iva)}</p>
+                                {isEditing ? (
+                                    <input type="number" step="0.01" className="input input-bordered w-full mt-1" value={editData.pressupost_licitacio_amb_iva || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_amb_iva: parseFloat(e.target.value) || undefined })} />
+                                ) : (
+                                    <p className="text-slate-700">{formatCurrency(contrato.pressupost_licitacio_amb_iva)}</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -443,20 +761,36 @@ export default function ContratoDetalle() {
                     <div className="space-y-4">
                         <div>
                             <label className="text-sm text-slate-500">Organisme Adjudicador</label>
-                            <p className="text-slate-700">{contrato.organisme_adjudicador || '-'}</p>
+                            {isEditing ? (
+                                <input type="text" className="input input-bordered w-full mt-1" value={editData.organisme_adjudicador || ""} onChange={(e) => setEditData({ ...editData, organisme_adjudicador: e.target.value })} />
+                            ) : (
+                                <p className="text-slate-700">{contrato.organisme_adjudicador || '-'}</p>
+                            )}
                         </div>
                         <div>
                             <label className="text-sm text-slate-500">Departament Adjudicador</label>
-                            <p className="text-slate-700">{contrato.departament_adjudicador || '-'}</p>
+                            {isEditing ? (
+                                <input type="text" className="input input-bordered w-full mt-1" value={editData.departament_adjudicador || ""} onChange={(e) => setEditData({ ...editData, departament_adjudicador: e.target.value })} />
+                            ) : (
+                                <p className="text-slate-700">{contrato.departament_adjudicador || '-'}</p>
+                            )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm text-slate-500">Procediment</label>
-                                <p className="text-slate-700">{contrato.procediment || '-'}</p>
+                                {isEditing ? (
+                                    <input type="text" className="input input-bordered w-full mt-1" value={editData.procediment || ""} onChange={(e) => setEditData({ ...editData, procediment: e.target.value })} />
+                                ) : (
+                                    <p className="text-slate-700">{contrato.procediment || '-'}</p>
+                                )}
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Tipus Tramitació</label>
-                                <p className="text-slate-700">{contrato.tipus_tramitacio || '-'}</p>
+                                {isEditing ? (
+                                    <input type="text" className="input input-bordered w-full mt-1" value={editData.tipus_tramitacio || ""} onChange={(e) => setEditData({ ...editData, tipus_tramitacio: e.target.value })} />
+                                ) : (
+                                    <p className="text-slate-700">{contrato.tipus_tramitacio || '-'}</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -472,7 +806,11 @@ export default function ContratoDetalle() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-sm text-slate-500">Data Formalització</label>
-                                <p className="text-slate-700">{formatDate(contrato.data_formalitzacio)}</p>
+                                {isEditing ? (
+                                    <input type="date" className="input input-bordered w-full mt-1" value={editData.data_formalitzacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_formalitzacio: e.target.value })} />
+                                ) : (
+                                    <p className="text-slate-700">{formatDate(contrato.data_formalitzacio)}</p>
+                                )}
                             </div>
                             <div className="p-3 rounded-xl bg-blue-50">
                                 <label className="text-sm text-blue-600">Durada del Contracte</label>
@@ -484,15 +822,23 @@ export default function ContratoDetalle() {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-3 rounded-xl bg-green-50">
                                 <label className="text-sm text-green-600">Data Inici</label>
-                                <p className="font-medium text-green-800">{formatDate(contrato.data_inici)}</p>
+                                {isEditing ? (
+                                    <input type="date" className="input input-bordered w-full mt-1" value={editData.data_inici?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_inici: e.target.value })} />
+                                ) : (
+                                    <p className="font-medium text-green-800">{formatDate(contrato.data_inici)}</p>
+                                )}
                             </div>
                             <div className={`p-3 rounded-xl ${contrato.possiblement_finalitzat ? 'bg-red-50' : contrato.alerta_finalitzacio ? 'bg-yellow-50' : 'bg-slate-50'}`}>
                                 <label className={`text-sm ${contrato.possiblement_finalitzat ? 'text-red-600' : contrato.alerta_finalitzacio ? 'text-yellow-600' : 'text-slate-500'}`}>
                                     Data Final
                                 </label>
-                                <p className={`font-medium ${contrato.possiblement_finalitzat ? 'text-red-800' : contrato.alerta_finalitzacio ? 'text-yellow-800' : 'text-slate-700'}`}>
-                                    {formatDate(contrato.data_final)}
-                                </p>
+                                {isEditing ? (
+                                    <input type="date" className="input input-bordered w-full mt-1" value={editData.data_final?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_final: e.target.value })} />
+                                ) : (
+                                    <p className={`font-medium ${contrato.possiblement_finalitzat ? 'text-red-800' : contrato.alerta_finalitzacio ? 'text-yellow-800' : 'text-slate-700'}`}>
+                                        {formatDate(contrato.data_final)}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -518,47 +864,68 @@ export default function ContratoDetalle() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <label className="text-sm text-slate-500 block mb-2">CPV Principal</label>
-                        {contrato.cpv_principal_codi ? (
-                            <div className="flex flex-col gap-3 mb-2">
-                                {Array.from(new Set(contrato.cpv_principal_codi.split('||'))).filter(Boolean).map((cpv, index) => (
-                                    <div key={index} className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary-200 transition-colors">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="bg-primary-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                                                CPV
-                                            </span>
-                                            <span className="font-mono text-sm font-bold text-slate-700">
-                                                {cpv}
-                                            </span>
-                                        </div>
-                                        {cpvDescriptions[cpv] && (
-                                            <p className="text-sm text-slate-600 leading-snug font-medium">
-                                                {cpvDescriptions[cpv]}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                        {isEditing ? (
+                            <div className="space-y-2">
+                                <input type="text" className="input input-bordered w-full mt-1" placeholder="Codi CPV (ex: 79000000-4)" value={editData.cpv_principal_codi || ""} onChange={(e) => setEditData({ ...editData, cpv_principal_codi: e.target.value })} />
+                                <textarea className="input input-bordered w-full mt-1 text-sm" placeholder="Descripció CPV" rows={2} value={editData.cpv_principal_descripcio || ""} onChange={(e) => setEditData({ ...editData, cpv_principal_descripcio: e.target.value })} />
                             </div>
                         ) : (
-                            <p className="text-slate-700">-</p>
-                        )}
-                        {contrato.cpv_principal_descripcio && (
-                            <div className="mt-3 pt-3 border-t border-slate-100">
-                                <label className="text-xs text-slate-400 block mb-1">Descripció original de l'expedient</label>
-                                <p className="text-sm text-slate-500 italic">{contrato.cpv_principal_descripcio}</p>
-                            </div>
+                            <>
+                                {contrato.cpv_principal_codi ? (
+                                    <div className="flex flex-col gap-3 mb-2">
+                                        {Array.from(new Set(contrato.cpv_principal_codi.split('||'))).filter(Boolean).map((cpv, index) => (
+                                            <div key={index} className="flex flex-col p-3 rounded-xl bg-slate-50 border border-slate-200 hover:border-primary-200 transition-colors">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="bg-primary-600 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                        CPV
+                                                    </span>
+                                                    <span className="font-mono text-sm font-bold text-slate-700">
+                                                        {cpv}
+                                                    </span>
+                                                </div>
+                                                {cpvDescriptions[cpv] && (
+                                                    <p className="text-sm text-slate-600 leading-snug font-medium">
+                                                        {cpvDescriptions[cpv]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-700">-</p>
+                                )}
+                                {contrato.cpv_principal_descripcio && (
+                                    <div className="mt-3 pt-3 border-t border-slate-100">
+                                        <label className="text-xs text-slate-400 block mb-1">Descripció original de l'expedient</label>
+                                        <p className="text-sm text-slate-500 italic">{contrato.cpv_principal_descripcio}</p>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                     <div>
                         <label className="text-sm text-slate-500">NUTS</label>
-                        <p className="text-slate-700">{contrato.codi_nuts || '-'}</p>
+                        {isEditing ? (
+                            <input type="text" className="input input-bordered w-full mt-1" value={editData.codi_nuts || ""} onChange={(e) => setEditData({ ...editData, codi_nuts: e.target.value })} />
+                        ) : (
+                            <p className="text-slate-700">{contrato.codi_nuts || '-'}</p>
+                        )}
                     </div>
                     <div>
                         <label className="text-sm text-slate-500">Lot</label>
-                        <p className="text-slate-700">{contrato.lots || '-'}</p>
+                        {isEditing ? (
+                            <input type="text" className="input input-bordered w-full mt-1" value={editData.lots || ""} onChange={(e) => setEditData({ ...editData, lots: e.target.value })} />
+                        ) : (
+                            <p className="text-slate-700">{contrato.lots || '-'}</p>
+                        )}
                     </div>
                     <div>
                         <label className="text-sm text-slate-500">Forma de Finançament</label>
-                        <p className="text-slate-700">{contrato.forma_financament || '-'}</p>
+                        {isEditing ? (
+                            <input type="text" className="input input-bordered w-full mt-1" value={editData.forma_financament || ""} onChange={(e) => setEditData({ ...editData, forma_financament: e.target.value })} />
+                        ) : (
+                            <p className="text-slate-700">{contrato.forma_financament || '-'}</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -969,405 +1336,8 @@ export default function ContratoDetalle() {
                                  )}
                              </div>
                          </div>
-                     </div>
-                 )}
-
-            {/* Edit Modal */}
-            {showEditModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="glass-card p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold text-slate-800">Editar Contracte</h3>
-                            <button
-                                className="p-2 hover:bg-slate-100 rounded-lg"
-                                onClick={() => setShowEditModal(false)}
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Informació Bàsica</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Codi Expedient</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.codi_expedient || ""} onChange={(e) => setEditData({ ...editData, codi_expedient: e.target.value })} />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm text-slate-600 mb-1">Objecte Contracte</label>
-                                        <textarea className="input input-bordered w-full" rows={3} value={editData.objecte_contracte || ""} onChange={(e) => setEditData({ ...editData, objecte_contracte: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Tipus Contracte</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.tipus_contracte || ""} onChange={(e) => setEditData({ ...editData, tipus_contracte: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Estat Actual</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.estat_actual || ""} onChange={(e) => setEditData({ ...editData, estat_actual: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Estado Interno</label>
-                                        <select className="input input-bordered w-full" value={editData.estado_interno || ""} onChange={(e) => setEditData({ ...editData, estado_interno: e.target.value })}>
-                                            <option value="normal">Normal</option>
-                                            <option value="pendiente_aprobacion">Pendent d'aprovació</option>
-                                            <option value="aprobado">Aprovat</option>
-                                            <option value="rechazado">Rebutjat</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Departaments Assignats</label>
-                                        <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-lg">
-                                            {departamentos.map(d => (
-                                                <label key={d.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                                                        checked={(editData as any).departamentos_ids?.includes(d.id)}
-                                                        onChange={(e) => {
-                                                            const currentIds = (editData as any).departamentos_ids || [];
-                                                            if (e.target.checked) {
-                                                                setEditData({ ...editData, departamentos_ids: [...currentIds, d.id] } as any);
-                                                            } else {
-                                                                setEditData({ ...editData, departamentos_ids: currentIds.filter((id: number) => id !== d.id) } as any);
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span className="text-sm font-medium text-slate-700">{d.nombre}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Lots</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.lots || ""} onChange={(e) => setEditData({ ...editData, lots: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Organisme</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Organisme Adjudicador</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.organisme_adjudicador || ""} onChange={(e) => setEditData({ ...editData, organisme_adjudicador: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Departament Adjudicador</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.departament_adjudicador || ""} onChange={(e) => setEditData({ ...editData, departament_adjudicador: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Procediment</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.procediment || ""} onChange={(e) => setEditData({ ...editData, procediment: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Tipus Tramitacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.tipus_tramitacio || ""} onChange={(e) => setEditData({ ...editData, tipus_tramitacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Codi Ine10</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.codi_ine10 || ""} onChange={(e) => setEditData({ ...editData, codi_ine10: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Codi Dir3</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.codi_dir3 || ""} onChange={(e) => setEditData({ ...editData, codi_dir3: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Responsables i Avisos */}
-                            {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable') && (
-                                <div>
-                                    <h4 className="font-medium text-slate-700 mb-3 flex items-center gap-2">
-                                        <AlertCircle size={18} className="text-primary-600" />
-                                        Avisos i Responsables
-                                    </h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                                        <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                Mesos d'avís abans de venciment
-                                            </label>
-                                            <p className="text-xs text-slate-500 mb-2">Per defecte són 3 mesos des de configuració.</p>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="60"
-                                                className="input input-bordered w-full"
-                                                placeholder="Deixa-ho en blanc per usar l'avís per defecte"
-                                                value={editData.meses_aviso_vencimiento || ""}
-                                                onChange={(e) => setEditData({ ...editData, meses_aviso_vencimiento: e.target.value ? parseInt(e.target.value) : undefined })}
-                                            />
-                                        </div>
-                                        {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">
-                                                    Responsables assignats
-                                                </label>
-                                                <p className="text-xs text-slate-500 mb-2">Usuaris que rebran l'avís i podran gestionar-lo.</p>
-                                                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto p-2 bg-white border border-slate-200 rounded-lg">
-                                                    {empleados.map(emp => (
-                                                        <label key={emp.id} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-50 rounded">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                                                                checked={(editData as any).responsables_ids?.includes(emp.id)}
-                                                                onChange={(e) => {
-                                                                    const currentIds = (editData as any).responsables_ids || [];
-                                                                    if (e.target.checked) {
-                                                                        setEditData({ ...editData, responsables_ids: [...currentIds, emp.id] } as any);
-                                                                    } else {
-                                                                        setEditData({ ...editData, responsables_ids: currentIds.filter((id: number) => id !== emp.id) } as any);
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <span className="text-sm font-medium text-slate-700">{emp.nombre}</span>
-                                                            <span className="text-xs text-slate-400">({emp.email})</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
-                            <>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Adjudicatari</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Adjudicatari Nom</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.adjudicatari_nom || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nom: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Adjudicatari Nif</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.adjudicatari_nif || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nif: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Adjudicatari Nacionalitat</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.adjudicatari_nacionalitat || ""} onChange={(e) => setEditData({ ...editData, adjudicatari_nacionalitat: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Imports</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Preu Licitar</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.preu_licitar || ""} onChange={(e) => setEditData({ ...editData, preu_licitar: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Preu Adjudicar</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.preu_adjudicar || ""} onChange={(e) => setEditData({ ...editData, preu_adjudicar: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Import Adjudicacio Amb Iva</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.import_adjudicacio_amb_iva || ""} onChange={(e) => setEditData({ ...editData, import_adjudicacio_amb_iva: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Import Licitar Sense Iva</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.import_licitar_sense_iva || ""} onChange={(e) => setEditData({ ...editData, import_licitar_sense_iva: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Pressupost Licitacio Sense Iva</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.pressupost_licitacio_sense_iva || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_sense_iva: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Pressupost Licitacio Sense Iva Expedient</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.pressupost_licitacio_sense_iva_expedient || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_sense_iva_expedient: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Pressupost Licitacio Amb Iva</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.pressupost_licitacio_amb_iva || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_amb_iva: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Pressupost Licitacio Amb Iva Expedient</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.pressupost_licitacio_amb_iva_expedient || ""} onChange={(e) => setEditData({ ...editData, pressupost_licitacio_amb_iva_expedient: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Valor Estimat Expedient</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.valor_estimat_expedient || ""} onChange={(e) => setEditData({ ...editData, valor_estimat_expedient: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Dates</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Publicacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_publicacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_publicacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Actualitzacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_actualitzacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_actualitzacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Inici</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_inici?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_inici: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Final</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_final?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_final: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Formalitzacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_formalitzacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_formalitzacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Anunci Previ</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_anunci_previ?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_anunci_previ: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Anunci Licitacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_anunci_licitacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_anunci_licitacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Anunci Adjudicacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_anunci_adjudicacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_anunci_adjudicacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Anunci Formalitzacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_anunci_formalitzacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_anunci_formalitzacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Data Anulacio</label>
-                                        <input type="date" className="input input-bordered w-full" value={editData.data_anulacio?.split("T")[0] || ""} onChange={(e) => setEditData({ ...editData, data_anulacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Durada Contracte</label>
-                                        <input type="number" step="0.01" className="input input-bordered w-full" value={editData.durada_contracte || ""} onChange={(e) => setEditData({ ...editData, durada_contracte: parseFloat(e.target.value) || undefined })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Classificació</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Cpv Principal Codi</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.cpv_principal_codi || ""} onChange={(e) => setEditData({ ...editData, cpv_principal_codi: e.target.value })} />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm text-slate-600 mb-1">Cpv Principal Descripcio</label>
-                                        <textarea className="input input-bordered w-full" rows={3} value={editData.cpv_principal_descripcio || ""} onChange={(e) => setEditData({ ...editData, cpv_principal_descripcio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Codi Nuts</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.codi_nuts || ""} onChange={(e) => setEditData({ ...editData, codi_nuts: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Descripcio Nuts</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.descripcio_nuts || ""} onChange={(e) => setEditData({ ...editData, descripcio_nuts: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Forma Financament</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.forma_financament || ""} onChange={(e) => setEditData({ ...editData, forma_financament: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-medium text-slate-700 mb-3">Enllaços</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Anunci Previ</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_anunci_previ || ""} onChange={(e) => setEditData({ ...editData, enllac_anunci_previ: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Licitacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_licitacio || ""} onChange={(e) => setEditData({ ...editData, enllac_licitacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Adjudicacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_adjudicacio || ""} onChange={(e) => setEditData({ ...editData, enllac_adjudicacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Formalitzacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_formalitzacio || ""} onChange={(e) => setEditData({ ...editData, enllac_formalitzacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Perfil Contractant</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_perfil_contractant || ""} onChange={(e) => setEditData({ ...editData, enllac_perfil_contractant: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Enllac Publicacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.enllac_publicacio || ""} onChange={(e) => setEditData({ ...editData, enllac_publicacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">Url Plataforma Contractacio</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_plataforma_contractacio || ""} onChange={(e) => setEditData({ ...editData, url_plataforma_contractacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Futura</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_futura || ""} onChange={(e) => setEditData({ ...editData, url_json_futura: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Agregada</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_agregada || ""} onChange={(e) => setEditData({ ...editData, url_json_agregada: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON CPM</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_cpm || ""} onChange={(e) => setEditData({ ...editData, url_json_cpm: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Previ</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_previ || ""} onChange={(e) => setEditData({ ...editData, url_json_previ: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Licitació</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_licitacio || ""} onChange={(e) => setEditData({ ...editData, url_json_licitacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Avaluació</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_avaluacio || ""} onChange={(e) => setEditData({ ...editData, url_json_avaluacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Adjudicació</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_adjudicacio || ""} onChange={(e) => setEditData({ ...editData, url_json_adjudicacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Formalització</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_formalitzacio || ""} onChange={(e) => setEditData({ ...editData, url_json_formalitzacio: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm text-slate-600 mb-1">URL JSON Anul·lació</label>
-                                        <input type="text" className="input input-bordered w-full" value={editData.url_json_anulacio || ""} onChange={(e) => setEditData({ ...editData, url_json_anulacio: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-                            </>
-                            )}
-
-                        </div>
-
-                        <div className="flex gap-3 pt-6 mt-6 border-t border-slate-100">
-                            <button
-                                type="button"
-                                className="btn btn-secondary flex-1"
-                                onClick={() => setShowEditModal(false)}
-                            >
-                                Cancel·lar
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-primary flex-1 gap-2"
-                                onClick={handleSave}
-                                disabled={saving}
-                            >
-                                {saving ? (
-                                    <>
-                                        <div className="loading-spinner w-4 h-4"></div>
-                                        Guardant...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check size={18} />
-                                        Guardar Canvis
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                      </div>
+                  )}
         </div>
     );
 }

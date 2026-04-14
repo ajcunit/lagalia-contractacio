@@ -464,11 +464,24 @@ class SyncService:
                     if not existing:
                         # New contract
                         contrato = models.Contrato(**mapped_data)
-                        dept_id = SyncService.apply_association_rules(db, contrato)
-                        if dept_id:
-                            dept = db.query(models.Departamento).filter(models.Departamento.id == dept_id).first()
-                            if dept:
-                                contrato.departamentos = [dept]
+                        
+                        # Inheritance: if another record for SAME expedient/lot already has departments, copy them
+                        pre_existing = db.query(models.Contrato).filter(
+                            models.Contrato.codi_expedient == expedient,
+                            models.Contrato.lots == lot,
+                            models.Contrato.departamentos.any()
+                        ).first()
+                        
+                        if pre_existing:
+                            contrato.departamentos = pre_existing.departamentos
+                        else:
+                            # If no inheritance, apply association rules
+                            dept_id = SyncService.apply_association_rules(db, contrato)
+                            if dept_id:
+                                dept = db.query(models.Departamento).filter(models.Departamento.id == dept_id).first()
+                                if dept:
+                                    contrato.departamentos = [dept]
+                        
                         db.add(contrato)
                         db.commit()  # Commit immediately
                         nuevos += 1

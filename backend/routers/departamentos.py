@@ -95,7 +95,9 @@ def get_departamento_empleados(departamento_id: int, db: Session = Depends(get_d
     dept = db.query(models.Departamento).filter(models.Departamento.id == departamento_id).first()
     if not dept:
         raise HTTPException(status_code=404, detail="Departamento no encontrado")
-    return db.query(models.Empleado).filter(models.Empleado.departamento_id == departamento_id).all()
+    return db.query(models.Empleado).filter(
+        models.Empleado.departamentos.any(models.Departamento.id == departamento_id)
+    ).all()
 
 
 @router.get("/{departamento_id}/contratos", response_model=List[schemas.ContratoListItem])
@@ -109,5 +111,5 @@ def get_departamento_contratos(
     if not dept:
         raise HTTPException(status_code=404, detail="Departamento no encontrado")
     return db.query(models.Contrato).filter(
-        models.Contrato.departamento_id == departamento_id
-    ).offset(skip).limit(limit).all()
+        models.Contrato.departamentos.any(models.Departamento.id == departamento_id)
+    ).order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()
