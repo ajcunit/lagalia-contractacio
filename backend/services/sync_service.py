@@ -842,7 +842,7 @@ class SyncService:
             where_clause = f"id_organisme_contractant='{codi_ine10}' AND procediment_adjudicacio='Menor'"
             url = f"{api_url}?$where={where_clause}&$limit=50000"
             
-            yield f'data: {json.dumps({"msg": "Connectant amb l\\'API de Contractes Menors...", "progress": 5})}\n\n'
+            yield f'data: {json.dumps({"msg": "Connectant amb API de Contractes Menors...", "progress": 5})}\n\n'
             response = httpx.get(url, timeout=120.0)
             response.raise_for_status()
             records = response.json()
@@ -869,7 +869,7 @@ class SyncService:
                     grouped[exp]["liquidacio"] = r
             
             total_exps = len(grouped)
-            yield f'data: {json.dumps({"msg": f"S\\'han trobat {total_exps} expedients. Processant...", "progress": 20})}\n\n'
+            yield f'data: {json.dumps({"msg": f"Trobats {total_exps} expedients. Processant...", "progress": 20})}\n\n'
             
             menors_nous = 0
             menors_actualitzats = 0
