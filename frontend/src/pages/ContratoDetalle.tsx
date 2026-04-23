@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { api, Contrato, Prorroga, Empleado } from '../api/client';
+import { api, Contrato, Prorroga, Empleado, CriteriAdjudicacio, MembreMesa, DocumentFase } from '../api/client';
 import {
     ArrowLeft,
     Building2,
@@ -16,7 +16,6 @@ import {
     Clock,
     AlertCircle,
     ChevronDown,
-    Search,
     Download,
     Users,
     Layers,
@@ -38,83 +37,9 @@ export default function ContratoDetalle() {
     const [prorrogues, setProrrogues] = useState<Prorroga[]>([]);
     const [modificacions, setModificacions] = useState<any[]>([]);
     const [departamentos, setDepartamentos] = useState<any[]>([]);
+    const [enriching, setEnriching] = useState(false);
+    const [activeFaseTab, setActiveFaseTab] = useState<string>('licitacio');
     
-    // JSON Document state
-    const [documentsJson, setDocumentsJson] = useState<{label: string, url: string}[]>([]);
-    const [mesaMembers, setMesaMembers] = useState<{name: string, carrec: string}[]>([]);
-    const [loadingJson, setLoadingJson] = useState(false);
-    const [activeJsonId, setActiveJsonId] = useState<string | null>(null);
-    const [jsonError, setJsonError] = useState<string | null>(null);
-
-    const handleExploreJson = async (url: string, jsonId: string) => {
-        if (activeJsonId === jsonId && (documentsJson.length > 0 || mesaMembers.length > 0 || jsonError)) {
-            setActiveJsonId(null);
-            setDocumentsJson([]);
-            setMesaMembers([]);
-            setJsonError(null);
-            return;
-        }
-        
-        setLoadingJson(true);
-        setActiveJsonId(jsonId);
-        setJsonError(null);
-        setDocumentsJson([]);
-        setMesaMembers([]);
-        
-        try {
-            const data = await api.getProxyJson(url);
-            const foundDocs: {label: string, url: string}[] = [];
-            const foundMembers: {name: string, carrec: string}[] = [];
-            
-            const findContent = (obj: any) => {
-                if (!obj || typeof obj !== 'object') return;
-                
-                // Buscar membres de la Mesa (normalment a dadesPublicacio o dadesExpedient)
-                if (obj.membresMesa && Array.isArray(obj.membresMesa)) {
-                    obj.membresMesa.forEach((m: any) => {
-                        const name = `${m.nom || ''} ${m.cognoms || ''}`.trim();
-                        if (name) {
-                            foundMembers.push({
-                                name,
-                                carrec: m.carrec?.ca || m.carrec?.es || m.carrec?.en || m.carrec?.oc || '-'
-                            });
-                        }
-                    });
-                }
-
-                if (Array.isArray(obj)) {
-                    obj.forEach(item => findContent(item));
-                } else {
-                    // Buscar documents
-                    if (obj.id && obj.titol && obj.hash) {
-                        foundDocs.push({
-                            label: obj.titol,
-                            url: `https://contractaciopublica.cat/portal-api/descarrega-document/${obj.id}/${obj.hash}`
-                        });
-                    }
-                    // Sempre buscar en les claus per si hi ha mes content
-                    Object.values(obj).forEach(val => findContent(val));
-                }
-            };
-            
-            findContent(data);
-            
-            // Deduplicar membres si cal (a vegades surten repetits en diferents nodes)
-            const uniqueMembers = Array.from(new Map(foundMembers.map(m => [m.name, m])).values());
-            
-            setDocumentsJson(foundDocs);
-            setMesaMembers(uniqueMembers);
-            
-            if (foundDocs.length === 0 && uniqueMembers.length === 0) {
-                setJsonError("No s'ha trobat cap document ni informació de la Mesa en aquest fitxer.");
-            }
-        } catch (err: any) {
-            console.error("Error explorant el JSON:", err);
-            setJsonError("No s'ha pogut carregar el contingut del JSON. Revisa el format o la connexió.");
-        } finally {
-            setLoadingJson(false);
-        }
-    };
     const [cpvDescriptions, setCpvDescriptions] = useState<Record<string, string>>({});
     const [lots, setLots] = useState<Contrato[]>([]);
     const [expandedLots, setExpandedLots] = useState<Set<number>>(new Set());
@@ -223,6 +148,19 @@ export default function ContratoDetalle() {
         }
     };
 
+    const handleEnrich = async () => {
+        if (!id) return;
+        try {
+            setEnriching(true);
+            await api.enrichContrato(parseInt(id));
+            await loadContrato(parseInt(id));
+        } catch (err) {
+            console.error('Error enriching:', err);
+        } finally {
+            setEnriching(false);
+        }
+    };
+
     const formatCurrency = (value?: number) => {
         if (value === undefined || value === null) return '-';
         return new Intl.NumberFormat('ca-ES', {
@@ -327,10 +265,18 @@ export default function ContratoDetalle() {
                         </a>
                     )}
                 {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
+                    <>
+                    {!contrato.fecha_enriquiment && (
+                        <button onClick={handleEnrich} disabled={enriching} className="btn btn-secondary gap-2" title="Descarrega dades detallades de les fases">
+                            {enriching ? <div className="loading-spinner w-4 h-4"></div> : <Download size={18} />}
+                            {enriching ? 'Enriquint...' : 'Enriquir'}
+                        </button>
+                    )}
                     <button onClick={handleOpenEdit} className="btn btn-primary gap-2">
                         <Edit size={18} />
                         Editar
                     </button>
+                    </>
                 )}
                 </div>
             </div>
@@ -352,7 +298,7 @@ export default function ContratoDetalle() {
                 <div className="glass-card p-6">
                     <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
                         <User size={20} className="text-primary-600" />
-                        Adjudicació
+                        Dades de l'Adjudicatari
                     </h3>
                     <div className="space-y-4">
                         <div>
@@ -369,6 +315,39 @@ export default function ContratoDetalle() {
                                 <p className="text-slate-700">{contrato.adjudicatari_nacionalitat || '-'}</p>
                             </div>
                         </div>
+                        {(contrato.adjudicatari_tipus_empresa || contrato.adjudicatari_telefon || contrato.adjudicatari_email) && (
+                            <div className="pt-2 border-t border-slate-100 space-y-3">
+                                {contrato.adjudicatari_tipus_empresa && (
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm text-slate-500">Tipus Empresa</label>
+                                        <span className="badge badge-info">{contrato.adjudicatari_tipus_empresa}</span>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {contrato.adjudicatari_telefon && (
+                                        <div>
+                                            <label className="text-xs text-slate-500">Telèfon</label>
+                                            <p className="text-sm text-primary-600 font-medium">
+                                                <a href={`tel:${contrato.adjudicatari_telefon}`}>{contrato.adjudicatari_telefon}</a>
+                                            </p>
+                                        </div>
+                                    )}
+                                    {contrato.adjudicatari_email && (
+                                        <div>
+                                            <label className="text-xs text-slate-500">Email</label>
+                                            <p className="text-sm text-primary-600 font-medium truncate">
+                                                <a href={`mailto:${contrato.adjudicatari_email}`} title={contrato.adjudicatari_email}>{contrato.adjudicatari_email}</a>
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                {contrato.adjudicatari_tercer_sector && contrato.adjudicatari_tercer_sector !== 'No tercer sector' && (
+                                    <div className="p-2 rounded-lg bg-green-50 text-green-700 text-xs font-medium">
+                                        Tercer Sector: {contrato.adjudicatari_tercer_sector}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -456,29 +435,36 @@ export default function ContratoDetalle() {
                     </h3>
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-sm text-slate-500">Data Formalització</label>
-                                <p className="text-slate-700">{formatDate(contrato.data_formalitzacio)}</p>
-                            </div>
-                            <div className="p-3 rounded-xl bg-blue-50">
-                                <label className="text-sm text-blue-600">Durada del Contracte</label>
-                                <p className="text-lg font-bold text-blue-800">
-                                    {contrato.durada_contracte ? `${contrato.durada_contracte} mesos` : '-'}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
                             <div className="p-3 rounded-xl bg-green-50">
                                 <label className="text-sm text-green-600">Data Inici</label>
-                                <p className="font-medium text-green-800">{formatDate(contrato.data_inici)}</p>
+                                <p className="font-medium text-green-800">{formatDate(contrato.data_inici_execucio || contrato.data_inici)}</p>
                             </div>
                             <div className={`p-3 rounded-xl ${contrato.possiblement_finalitzat ? 'bg-red-50' : contrato.alerta_finalitzacio ? 'bg-yellow-50' : 'bg-slate-50'}`}>
                                 <label className={`text-sm ${contrato.possiblement_finalitzat ? 'text-red-600' : contrato.alerta_finalitzacio ? 'text-yellow-600' : 'text-slate-500'}`}>
                                     Data Final
                                 </label>
                                 <p className={`font-medium ${contrato.possiblement_finalitzat ? 'text-red-800' : contrato.alerta_finalitzacio ? 'text-yellow-800' : 'text-slate-700'}`}>
-                                    {formatDate(contrato.data_final)}
+                                    {formatDate(contrato.data_fi_execucio || contrato.data_final)}
                                 </p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 rounded-xl bg-blue-50">
+                                <label className="text-sm text-blue-600">Durada del Contracte</label>
+                                <p className="text-lg font-bold text-blue-800">
+                                    {contrato.durada_anys !== null && contrato.durada_anys !== undefined ? (
+                                        [contrato.durada_anys > 0 ? `${contrato.durada_anys}a` : null,
+                                         contrato.durada_mesos && contrato.durada_mesos > 0 ? `${contrato.durada_mesos}m` : null,
+                                         contrato.durada_dies && contrato.durada_dies > 0 ? `${contrato.durada_dies}d` : null
+                                        ].filter(Boolean).join(' ') || '-'
+                                    ) : (
+                                        contrato.durada_contracte ? `${contrato.durada_contracte} mesos` : '-'
+                                    )}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="text-sm text-slate-500">Data Formalització</label>
+                                <p className="text-slate-700">{formatDate(contrato.data_formalitzacio)}</p>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -776,206 +762,272 @@ export default function ContratoDetalle() {
                 </div>
             )}
 
-            {/* Enlaces */}
-            {(contrato.enllac_perfil_contractant ||
-                contrato.url_plataforma_contractacio ||
-                contrato.enllac_licitacio ||
-                contrato.enllac_adjudicacio ||
-                contrato.url_json_futura ||
-                contrato.url_json_agregada ||
-                contrato.url_json_cpm ||
-                contrato.url_json_previ ||
-                contrato.url_json_licitacio ||
-                contrato.url_json_avaluacio ||
-                contrato.url_json_adjudicacio ||
-                contrato.url_json_formalitzacio ||
-                contrato.url_json_anulacio) && (
+            {/* === SECCIONS ENRIQUIDES === */}
+
+            {/* Criteris d'Adjudicació */}
+            {contrato.criteris_adjudicacio && contrato.criteris_adjudicacio.length > 0 && (
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <Layers size={20} className="text-primary-600" />
+                        Criteris d'Adjudicació
+                    </h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-200">
+                                    <th className="text-left py-3 px-4 text-slate-500 font-medium">Criteri</th>
+                                    <th className="text-right py-3 px-4 text-slate-500 font-medium">Ponderació</th>
+                                    <th className="text-left py-3 px-4 text-slate-500 font-medium">Detall</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {contrato.criteris_adjudicacio.map((c: CriteriAdjudicacio) => (
+                                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                        <td className="py-3 px-4 font-medium text-slate-800">{c.criteri_nom || '-'}</td>
+                                        <td className="py-3 px-4 text-right">
+                                            {c.ponderacio !== null && c.ponderacio !== undefined ? (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <div className="w-24 bg-slate-200 rounded-full h-2">
+                                                        <div 
+                                                            className="bg-primary-600 h-2 rounded-full transition-all" 
+                                                            style={{ width: `${Math.min(c.ponderacio, 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className="font-bold text-primary-700 min-w-[40px] text-right">{c.ponderacio}%</span>
+                                                </div>
+                                            ) : '-'}
+                                        </td>
+                                        <td className="py-3 px-4 text-slate-600">
+                                            {c.desglossament_json && c.desglossament_json.length > 0 ? (
+                                                <div className="space-y-1">
+                                                    {c.desglossament_json.map((d: any, i: number) => (
+                                                        <div key={i} className="text-xs">
+                                                            <span className="font-medium">{d.tipusCriteri?.ca || d.tipusCriteri?.es || ''}</span>
+                                                            {d.descripcioCriteri?.ca && (
+                                                                <span className="text-slate-500 ml-1">— {d.descripcioCriteri.ca.substring(0, 80)}{d.descripcioCriteri.ca.length > 80 ? '...' : ''}</span>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : '-'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Mesa de Contractació */}
+            {contrato.membres_mesa && contrato.membres_mesa.length > 0 && (
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <Users size={20} className="text-primary-600" />
+                        Mesa de Contractació
+                        <span className="bg-primary-100 text-primary-700 text-sm px-2 py-0.5 rounded-full">
+                            {contrato.membres_mesa.length}
+                        </span>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {contrato.membres_mesa.map((m: MembreMesa) => (
+                            <div key={m.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors">
+                                <p className="font-medium text-slate-800">{m.nom} {m.cognoms}</p>
+                                <p className="text-sm text-slate-500 mt-0.5">{m.carrec || '-'}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Documents de l'Expedient */}
+            {contrato.documents_fase && contrato.documents_fase.length > 0 && (
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <FileText size={20} className="text-primary-600" />
+                        Documents de l'Expedient
+                        <span className="bg-primary-100 text-primary-700 text-sm px-2 py-0.5 rounded-full">
+                            {contrato.documents_fase.length}
+                        </span>
+                    </h3>
+                    <div className="flex flex-wrap gap-1 border-b border-slate-200 mb-6">
+                        {['licitacio', 'avaluacio', 'adjudicacio', 'formalitzacio'].map(fase => {
+                            const hasDocs = contrato.documents_fase!.some((d: DocumentFase) => d.fase === fase);
+                            if (!hasDocs) return null;
+                            
+                            const faseLabels: Record<string, string> = {
+                                licitacio: 'Licitació',
+                                avaluacio: 'Avaluació',
+                                adjudicacio: 'Adjudicació',
+                                formalitzacio: 'Formalització'
+                            };
+
+                            return (
+                                <button
+                                    key={fase}
+                                    onClick={() => setActiveFaseTab(fase)}
+                                    className={`px-5 py-3 text-sm font-bold transition-all relative rounded-t-xl ${
+                                        activeFaseTab === fase
+                                            ? 'text-primary-600 bg-primary-50/30'
+                                            : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    {faseLabels[fase] || fase}
+                                    {activeFaseTab === fase && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 rounded-full" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="space-y-2">
+                        {contrato.documents_fase!
+                            .filter((d: DocumentFase) => d.fase === activeFaseTab)
+                            .map((d: DocumentFase) => (
+                                <div key={d.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:border-primary-200 transition-all hover:shadow-md">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 flex-shrink-0">
+                                            <FileText size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-slate-700 truncate">{d.titol}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {d.tipus_document && d.tipus_document !== 'document' && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{d.tipus_document}</span>
+                                                )}
+                                                {d.mida && (
+                                                    <span className="text-[10px] font-medium text-slate-400">
+                                                        {(d.mida / 1024).toFixed(0)} KB
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                                        {d.url_descarrega && (
+                                            <>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        addDocument({
+                                                            id: `${contrato?.codi_expedient}-${d.id}`,
+                                                            url: d.url_descarrega!,
+                                                            titol: d.titol || 'Document',
+                                                            expedient: contrato?.codi_expedient || 'Desconegut',
+                                                            origen: 'Licitia'
+                                                        });
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors text-xs font-black uppercase tracking-wider"
+                                                    title="Usar com a plantilla pel generador"
+                                                >
+                                                    <Plus size={14} />
+                                                    Plantilla
+                                                </button>
+                                                <a
+                                                    href={d.url_descarrega}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-50 text-slate-400 hover:text-primary-600 hover:bg-primary-50 transition-all border border-transparent hover:border-primary-100"
+                                                    title="Descarregar document"
+                                                >
+                                                    <Download size={18} />
+                                                </a>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Detall Econòmic Ampliat (si enriquit) */}
+            {contrato.fecha_enriquiment && (
+                <div className="grid grid-cols-1 gap-6">
+                    {/* Info Legal i Contractual */}
                     <div className="glass-card p-6">
                         <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                            <ExternalLink size={20} className="text-primary-600" />
-                            Enllaços
+                            <FileText size={20} className="text-primary-600" />
+                            Informació Contractual
                         </h3>
-                        <div className="flex flex-wrap gap-3">
-                            {contrato.enllac_perfil_contractant && (
-                                <a
-                                    href={contrato.enllac_perfil_contractant}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary gap-2"
-                                >
-                                    <ExternalLink size={16} />
-                                    Perfil Contractant
-                                </a>
+                        <div className="space-y-3">
+                            {contrato.normativa_aplicable && (
+                                <div>
+                                    <label className="text-sm text-slate-500">Normativa</label>
+                                    <p className="text-slate-700">{contrato.normativa_aplicable}</p>
+                                </div>
                             )}
-                            {contrato.url_plataforma_contractacio && (
-                                <a
-                                    href={contrato.url_plataforma_contractacio}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary gap-2"
-                                >
-                                    <ExternalLink size={16} />
-                                    Plataforma Contractació
-                                </a>
+                            {contrato.procediment_adjudicacio && (
+                                <div>
+                                    <label className="text-sm text-slate-500">Procediment d'Adjudicació</label>
+                                    <p className="text-slate-700">{contrato.procediment_adjudicacio}</p>
+                                </div>
                             )}
-                            {contrato.enllac_licitacio && (
-                                <a
-                                    href={contrato.enllac_licitacio}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary gap-2"
-                                >
-                                    <ExternalLink size={16} />
-                                    Anunci Licitació
-                                </a>
+                            {contrato.causa_habilitant && (
+                                <div>
+                                    <label className="text-sm text-slate-500">Causa Habilitant</label>
+                                    <p className="text-sm text-slate-700">{contrato.causa_habilitant}</p>
+                                </div>
                             )}
-                            {contrato.enllac_adjudicacio && (
-                                <a
-                                    href={contrato.enllac_adjudicacio}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn btn-secondary gap-2"
-                                >
-                                    <ExternalLink size={16} />
-                                    Anunci Adjudicació
-                                </a>
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                {contrato.total_ofertes_rebudes !== null && contrato.total_ofertes_rebudes !== undefined && (
+                                    <div className="p-3 rounded-xl bg-blue-50">
+                                        <label className="text-xs text-blue-600">Ofertes Rebudes</label>
+                                        <p className="text-lg font-bold text-blue-800">{contrato.total_ofertes_rebudes}</p>
+                                    </div>
+                                )}
+                                {contrato.iva_percentatge !== null && contrato.iva_percentatge !== undefined && (
+                                    <div className="p-3 rounded-xl bg-slate-50">
+                                        <label className="text-xs text-slate-500">IVA</label>
+                                        <p className="text-lg font-bold text-slate-800">{contrato.iva_percentatge}%</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-2 pt-2">
+                                {contrato.garantia_definitiva && (
+                                    <span className="badge badge-info">Garantia Definitiva{contrato.percentatge_garantia_definitiva ? ` (${contrato.percentatge_garantia_definitiva}%)` : ''}</span>
+                                )}
+                                {contrato.garantia_provisional && <span className="badge badge-info">Garantia Provisional</span>}
+                                {contrato.reserva_social && <span className="badge badge-success">Reserva Social</span>}
+                                {contrato.contracte_harmonitzat && <span className="badge badge-info">Harmonitzat</span>}
+                                {contrato.subcontractacio_permesa === true && <span className="badge badge-info">Subcontractació Permesa</span>}
+                                {contrato.subcontractacio_permesa === false && <span className="badge badge-pending">Sense Subcontractació</span>}
+                                {contrato.preveuen_modificacions && <span className="badge badge-info">Modificacions Previstes</span>}
+                                {contrato.preveuen_prorrogues && <span className="badge badge-info">Pròrrogues Previstes</span>}
+                            </div>
+                            {contrato.revisio_preus && (
+                                <div className="pt-2">
+                                    <label className="text-sm text-slate-500">Revisió de Preus</label>
+                                    <p className="text-sm text-slate-700">{contrato.revisio_preus}</p>
+                                </div>
                             )}
-                            
-                             {/* Phase Tabs & Explorer Container */}
-                             <div className="w-full mt-6 border-t border-slate-100 pt-6">
-                                 <div className="flex flex-wrap gap-1 border-b border-slate-200 mb-6">
-                                     {[
-                                         { id: 'futura', url: contrato.url_json_futura, label: 'Futura' },
-                                         { id: 'agregada', url: contrato.url_json_agregada, label: 'Agregada' },
-                                         { id: 'cpm', url: contrato.url_json_cpm, label: 'CPM' },
-                                         { id: 'previ', url: contrato.url_json_previ, label: 'Previ' },
-                                         { id: 'licitacio', url: contrato.url_json_licitacio, label: 'Licitació' },
-                                         { id: 'avaluacio', url: contrato.url_json_avaluacio, label: 'Avaluació' },
-                                         { id: 'adjudicacio', url: contrato.url_json_adjudicacio, label: 'Adjudicació' },
-                                         { id: 'formalitzacio', url: contrato.url_json_formalitzacio, label: 'Formalització' },
-                                         { id: 'anulacio', url: contrato.url_json_anulacio, label: 'Anul·lació' }
-                                     ].filter(f => f.url).map((phase) => (
-                                         <button
-                                             key={phase.id}
-                                             onClick={() => handleExploreJson(phase.url!, phase.id)}
-                                             className={`px-5 py-3 text-sm font-bold transition-all relative rounded-t-xl ${
-                                                 activeJsonId === phase.id
-                                                     ? 'text-primary-600 bg-primary-50/30'
-                                                     : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                                             }`}
-                                         >
-                                             {phase.label}
-                                             {activeJsonId === phase.id && (
-                                                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600 rounded-full" />
-                                             )}
-                                         </button>
-                                     ))}
-                                 </div>
- 
-                                 {/* Tab Content */}
-                                 {activeJsonId ? (
-                                     <div className="w-full p-6 rounded-2xl bg-white border border-slate-200 shadow-sm min-h-[220px] relative overflow-hidden">
-                                         {loadingJson && (
-                                             <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] flex items-center justify-center z-20">
-                                                 <div className="flex flex-col items-center gap-3">
-                                                     <div className="loading-spinner w-12 h-12 border-4 border-primary-600 border-t-transparent"></div>
-                                                     <p className="text-xs font-black text-slate-500 tracking-[0.2em] uppercase animate-pulse">Analitzant fase...</p>
-                                                 </div>
-                                             </div>
-                                         )}
-                                         
-                                         {mesaMembers.length > 0 && (
-                                             <div className="mb-8">
-                                                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                                     <Users size={14} className="text-primary-500" />
-                                                     Mesa de Contractació
-                                                 </h5>
-                                                 <div className="bg-slate-50/30 rounded-2xl border border-slate-100 overflow-hidden">
-                                                     <table className="min-w-full divide-y divide-slate-200">
-                                                         <thead className="bg-slate-50">
-                                                             <tr>
-                                                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase">Nom</th>
-                                                                 <th className="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase">Càrrec</th>
-                                                             </tr>
-                                                         </thead>
-                                                         <tbody className="divide-y divide-slate-100 bg-white">
-                                                             {mesaMembers.map((member, idx) => (
-                                                                 <tr key={idx} className="hover:bg-primary-50/20 transition-colors">
-                                                                     <td className="px-6 py-3.5 text-sm font-bold text-slate-700">{member.name}</td>
-                                                                     <td className="px-6 py-3.5 text-sm text-slate-500 italic font-medium">{member.carrec}</td>
-                                                                 </tr>
-                                                             ))}
-                                                         </tbody>
-                                                     </table>
-                                                 </div>
-                                             </div>
-                                         )}
- 
-                                         {documentsJson.length > 0 && (
-                                             <div>
-                                                 <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                                     <FileText size={14} className="text-primary-500" />
-                                                     Documents de la fase
-                                                 </h5>
-                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                     {documentsJson.map((doc, idx) => (
-                                                         <div key={idx} className="flex flex-col rounded-xl bg-slate-50/20 border border-slate-200 hover:border-primary-400 hover:bg-white hover:shadow-lg transition-all text-sm group overflow-hidden">
-                                                             <a 
-                                                                 href={doc.url}
-                                                                 target="_blank"
-                                                                 rel="noopener noreferrer"
-                                                                 className="flex items-center justify-between p-4 flex-1"
-                                                             >
-                                                                 <span className="truncate flex-1 text-slate-700 font-bold group-hover:text-primary-700">{doc.label}</span>
-                                                                 <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-primary-600 group-hover:border-primary-100 shadow-sm ml-3 flex-shrink-0">
-                                                                     <Download size={16} />
-                                                                 </div>
-                                                             </a>
-                                                             <div className="bg-slate-50 border-t border-slate-100 p-2 flex justify-end">
-                                                                 <button
-                                                                     onClick={(e) => {
-                                                                         e.stopPropagation();
-                                                                         addDocument({
-                                                                             id: `${contrato?.codi_expedient}-${idx}`,
-                                                                             url: doc.url,
-                                                                             titol: doc.label,
-                                                                             expedient: contrato?.codi_expedient || 'Desconegut',
-                                                                             origen: 'Licitia'
-                                                                         });
-                                                                     }}
-                                                                     className="btn btn-primary text-xs py-1 px-3"
-                                                                 >
-                                                                     <Plus size={14} className="mr-1"/>
-                                                                     Usar de Plantilla
-                                                                 </button>
-                                                             </div>
-                                                         </div>
-                                                     ))}
-                                                 </div>
-                                             </div>
-                                         )}
- 
-                                         {documentsJson.length === 0 && mesaMembers.length === 0 && !loadingJson && (
-                                             <div className="py-16 flex flex-col items-center justify-center text-center">
-                                                 <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 text-slate-200 border border-slate-100">
-                                                     {jsonError ? <AlertCircle size={32} className="text-red-300" /> : <Search size={32} />}
-                                                 </div>
-                                                 <p className={`max-w-xs text-sm font-semibold ${jsonError ? 'text-red-500' : 'text-slate-400 italic'}`}>
-                                                     {jsonError || "No s'han trobat dades en aquesta fase."}
-                                                 </p>
-                                             </div>
-                                         )}
-                                     </div>
-                                 ) : (
-                                     <div className="w-full py-16 rounded-2xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300 bg-slate-50/10">
-                                         <Layers size={48} className="mb-4 opacity-10" />
-                                         <p className="text-sm font-black uppercase tracking-[0.2em]">Selecciona una fase per explorar</p>
-                                     </div>
-                                 )}
-                             </div>
-                         </div>
-                     </div>
-                 )}
+                        </div>
+                    </div>
+
+                </div>
+            )}
+
+
+
+            {/* Peu de Recurs */}
+            {contrato.peu_recurs && (
+                <div className="glass-card p-6">
+                    <h3 className="text-lg font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                        <AlertCircle size={20} className="text-primary-600" />
+                        Peu de Recurs
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{contrato.peu_recurs}</p>
+                </div>
+            )}
+
+            {/* Enrichment timestamp */}
+            {contrato.fecha_enriquiment && (
+                <div className="text-xs text-slate-400 text-right">
+                    Dades enriquides el {formatDate(contrato.fecha_enriquiment)}
+                </div>
+            )}
+
 
             {/* Edit Modal */}
             {showEditModal && (

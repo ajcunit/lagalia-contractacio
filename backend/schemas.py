@@ -126,6 +126,42 @@ class ContratoBase(BaseModel):
     url_json_anulacio: Optional[str] = None
     data_finalitzacio_calculada: Optional[date] = None
     alerta_finalitzacio: Optional[bool] = False
+    
+    # Camps enriquits
+    normativa_aplicable: Optional[str] = None
+    tipus_publicacio_expedient: Optional[str] = None
+    procediment_adjudicacio: Optional[str] = None
+    acces_exclusiu: Optional[bool] = None
+    tipus_oferta_electronica: Optional[str] = None
+    compra_publica_innovacio: Optional[bool] = None
+    contracte_mixt: Optional[bool] = None
+    te_lots: Optional[bool] = None
+    contracte_harmonitzat: Optional[bool] = None
+    data_termini_presentacio: Optional[datetime] = None
+    preveuen_modificacions: Optional[bool] = None
+    preveuen_prorrogues: Optional[bool] = None
+    causa_habilitant: Optional[str] = None
+    divisio_lots: Optional[str] = None
+    garantia_provisional: Optional[bool] = None
+    garantia_definitiva: Optional[bool] = None
+    percentatge_garantia_definitiva: Optional[float] = None
+    reserva_social: Optional[bool] = None
+    import_adjudicacio_sense_iva: Optional[float] = None
+    iva_percentatge: Optional[float] = None
+    valor_estimat_contracte: Optional[float] = None
+    revisio_preus: Optional[str] = None
+    total_ofertes_rebudes: Optional[int] = None
+    durada_anys: Optional[int] = None
+    durada_mesos: Optional[int] = None
+    durada_dies: Optional[int] = None
+    data_inici_execucio: Optional[date] = None
+    data_fi_execucio: Optional[date] = None
+    adjudicatari_tipus_empresa: Optional[str] = None
+    adjudicatari_tercer_sector: Optional[str] = None
+    adjudicatari_telefon: Optional[str] = None
+    adjudicatari_email: Optional[str] = None
+    subcontractacio_permesa: Optional[bool] = None
+    peu_recurs: Optional[str] = None
     possiblement_finalitzat: Optional[bool] = False
 
 
@@ -150,6 +186,58 @@ class Contrato(ContratoBase):
     hash_contenido: Optional[str]
     fecha_primera_sincronizacion: Optional[datetime]
     fecha_ultima_sincronizacion: Optional[datetime]
+    fecha_enriquiment: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Schemas per entitats enriquides
+class CriteriAdjudicacioSchema(BaseModel):
+    id: int
+    contrato_id: int
+    index: int = 0
+    criteri_nom: Optional[str] = None
+    ponderacio: Optional[float] = None
+    desglossament_json: Optional[list] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MembreMesaSchema(BaseModel):
+    id: int
+    contrato_id: int
+    nom: Optional[str] = None
+    cognoms: Optional[str] = None
+    carrec: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentFaseSchema(BaseModel):
+    id: int
+    contrato_id: int
+    fase: str
+    tipus_document: Optional[str] = None
+    titol: Optional[str] = None
+    document_id: Optional[int] = None
+    hash_document: Optional[str] = None
+    mida: Optional[int] = None
+    url_descarrega: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ContratoDetallat(Contrato):
+    """Resposta enriquida amb totes les relacions."""
+    criteris_adjudicacio: List[CriteriAdjudicacioSchema] = []
+    membres_mesa: List[MembreMesaSchema] = []
+    documents_fase: List[DocumentFaseSchema] = []
+    prorrogues: List['Prorroga'] = []
+    modificacions: List['Modificacion'] = []
 
     class Config:
         from_attributes = True

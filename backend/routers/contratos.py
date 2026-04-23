@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc, nulls_last
 from typing import List, Optional, Dict
 from datetime import date, datetime
@@ -8,6 +9,7 @@ import models
 import schemas
 from services.auth_service import get_current_user
 from services.access_control import apply_department_filter
+from services.enrichment_service import EnrichmentService
 from fastapi import Header
 
 router = APIRouter(prefix="/contratos", tags=["contratos"])
@@ -333,12 +335,49 @@ def export_contratos_csv(
     )
 
 
-@router.get("/{contrato_id}", response_model=schemas.Contrato)
+@router.get("/enrich/stream")
+def enrich_batch_stream(
+    force: bool = False,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    """Enriqueix tots els contractes en batch via SSE."""
+    if current_user.rol not in ["admin", "responsable_contratacion"]:
+        raise HTTPException(status_code=403, detail="No tens permissos per enriquir contractes")
+    
+    return StreamingResponse(
+        EnrichmentService.enrich_batch_stream(db, force=force),
+        media_type="text/event-stream"
+    )
+
+
+@router.get("/{contrato_id}", response_model=schemas.ContratoDetallat)
 def get_contrato(contrato_id: int, db: Session = Depends(get_db)):
-    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    contrato = db.query(models.Contrato).options(
+        joinedload(models.Contrato.criteris_adjudicacio),
+        joinedload(models.Contrato.membres_mesa),
+        joinedload(models.Contrato.documents_fase),
+        joinedload(models.Contrato.prorrogues),
+        joinedload(models.Contrato.modificacions),
+    ).filter(models.Contrato.id == contrato_id).first()
     if not contrato:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
     return contrato
+
+
+@router.post("/{contrato_id}/enrich")
+def enrich_contrato(
+    contrato_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    """Enriqueix un contracte descarregant les dades de les fases."""
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contracte no trobat")
+    
+    result = EnrichmentService.enrich_contract(db, contrato_id)
+    return {"message": "Contracte enriquit correctament", "stats": result}
 
 
 @router.get("/{contrato_id}/lots", response_model=List[schemas.Contrato])

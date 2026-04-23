@@ -104,6 +104,77 @@ export interface Contrato {
     url_json_adjudicacio?: string;
     url_json_formalitzacio?: string;
     url_json_anulacio?: string;
+    // Enrichment fields
+    normativa_aplicable?: string;
+    tipus_publicacio_expedient?: string;
+    procediment_adjudicacio?: string;
+    acces_exclusiu?: boolean;
+    tipus_oferta_electronica?: string;
+    compra_publica_innovacio?: boolean;
+    contracte_mixt?: boolean;
+    te_lots?: boolean;
+    contracte_harmonitzat?: boolean;
+    data_termini_presentacio?: string;
+    preveuen_modificacions?: boolean;
+    preveuen_prorrogues?: boolean;
+    causa_habilitant?: string;
+    divisio_lots?: string;
+    garantia_provisional?: boolean;
+    garantia_definitiva?: boolean;
+    percentatge_garantia_definitiva?: number;
+    reserva_social?: boolean;
+    import_adjudicacio_sense_iva?: number;
+    iva_percentatge?: number;
+    valor_estimat_contracte?: number;
+    revisio_preus?: string;
+    total_ofertes_rebudes?: number;
+    durada_anys?: number;
+    durada_mesos?: number;
+    durada_dies?: number;
+    data_inici_execucio?: string;
+    data_fi_execucio?: string;
+    adjudicatari_tipus_empresa?: string;
+    adjudicatari_tercer_sector?: string;
+    adjudicatari_telefon?: string;
+    adjudicatari_email?: string;
+    subcontractacio_permesa?: boolean;
+    peu_recurs?: string;
+    fecha_enriquiment?: string;
+    // Relations
+    criteris_adjudicacio?: CriteriAdjudicacio[];
+    membres_mesa?: MembreMesa[];
+    documents_fase?: DocumentFase[];
+    prorrogues?: Prorroga[];
+    modificacions?: Modificacion[];
+}
+
+export interface CriteriAdjudicacio {
+    id: number;
+    contrato_id: number;
+    index: number;
+    criteri_nom?: string;
+    ponderacio?: number;
+    desglossament_json?: any[];
+}
+
+export interface MembreMesa {
+    id: number;
+    contrato_id: number;
+    nom?: string;
+    cognoms?: string;
+    carrec?: string;
+}
+
+export interface DocumentFase {
+    id: number;
+    contrato_id: number;
+    fase: string;
+    tipus_document?: string;
+    titol?: string;
+    document_id?: number;
+    hash_document?: string;
+    mida?: number;
+    url_descarrega?: string;
 }
 
 export interface Sincronizacion {
@@ -579,6 +650,12 @@ class ApiClient {
 
     async getModificacions(contratoId: number): Promise<Modificacion[]> {
         return this.request<Modificacion[]>(`/contratos/${contratoId}/modificacions`);
+    }
+
+    async enrichContrato(contratoId: number): Promise<{ message: string; stats: any }> {
+        return this.request<{ message: string; stats: any }>(`/contratos/${contratoId}/enrich`, {
+            method: 'POST',
+        });
     }
 
     // Contratos Menores
