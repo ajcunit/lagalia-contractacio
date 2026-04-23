@@ -154,29 +154,45 @@ class EnrichmentService:
     def _extract_criteris(data: dict) -> list:
         """Extreu els criteris d'adjudicació d'un JSON de fase."""
         criteris = []
-        # Buscar en dadesPublicacioLot (pot ser a licitació, adjudicació o formalització)
+        
+        # 1. Intentar extreure dels lots (més comú)
         lots = EnrichmentService._safe_get(data, "publicacio", "dadesPublicacioLot")
-        if not lots or not isinstance(lots, list):
-            return criteris
-        for lot in lots:
-            criteris_raw = lot.get("criterisAdjudicacio", [])
-            if not isinstance(criteris_raw, list):
-                continue
-            for c in criteris_raw:
-                nom = EnrichmentService._safe_get_ca(c, "criteri")
-                if not nom:
-                    # Fallback: agafar de les claus es/en
-                    criteri_obj = c.get("criteri", {})
-                    if isinstance(criteri_obj, dict):
-                        nom = criteri_obj.get("es") or criteri_obj.get("en") or "Sense nom"
-                ponderacio = c.get("ponderacio")
-                desglossament = c.get("desglossament", [])
-                criteris.append({
-                    "index": c.get("index", 0),
-                    "criteri_nom": nom,
-                    "ponderacio": ponderacio,
-                    "desglossament_json": desglossament
-                })
+        if isinstance(lots, list):
+            for lot in lots:
+                criteris_raw = lot.get("criterisAdjudicacio", [])
+                if isinstance(criteris_raw, list):
+                    for c in criteris_raw:
+                        nom = EnrichmentService._safe_get_ca(c, "criteri")
+                        if not nom:
+                            criteri_obj = c.get("criteri", {})
+                            if isinstance(criteri_obj, dict):
+                                nom = criteri_obj.get("es") or criteri_obj.get("en") or "Sense nom"
+                        
+                        criteris.append({
+                            "index": c.get("index", 0),
+                            "criteri_nom": nom,
+                            "ponderacio": c.get("ponderacio"),
+                            "desglossament_json": c.get("desglossament", [])
+                        })
+        
+        # 2. Si no n'hem trobat, provar a nivell global (dadesPublicacio)
+        if not criteris:
+            criteris_raw = EnrichmentService._safe_get(data, "publicacio", "dadesPublicacio", "criterisAdjudicacio")
+            if isinstance(criteris_raw, list):
+                for c in criteris_raw:
+                    nom = EnrichmentService._safe_get_ca(c, "criteri")
+                    if not nom:
+                        criteri_obj = c.get("criteri", {})
+                        if isinstance(criteri_obj, dict):
+                            nom = criteri_obj.get("es") or criteri_obj.get("en") or "Sense nom"
+                    
+                    criteris.append({
+                        "index": c.get("index", 0),
+                        "criteri_nom": nom,
+                        "ponderacio": c.get("ponderacio"),
+                        "desglossament_json": c.get("desglossament", [])
+                    })
+                    
         return criteris
 
     @staticmethod

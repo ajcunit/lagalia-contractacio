@@ -778,6 +778,110 @@ class ApiClient {
         return source;
     }
 
+    startEnrichBatchStream(
+        onMessage: (msg: string, progress: number) => void,
+        onError: (err: any) => void,
+        onComplete: () => void,
+        force: boolean = false
+    ): EventSource {
+        const { access } = getTokens();
+        const source = new EventSource(`${this.baseUrl}/contratos/enrich/stream?force=${force}&token=${encodeURIComponent(access || '')}`);
+        
+        source.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.error) {
+                    onError(new Error(data.msg));
+                    source.close();
+                } else if (data.done) {
+                    onMessage(data.msg, data.progress);
+                    onComplete();
+                    source.close();
+                } else {
+                    onMessage(data.msg, data.progress);
+                }
+            } catch (err) {
+                console.error("Failed to parse SSE", err);
+            }
+        };
+
+        source.onerror = (err) => {
+            onError(err);
+            source.close();
+        };
+
+        return source;
+    }
+
+    startCpvsSyncStream(
+        onMessage: (msg: string, progress: number) => void,
+        onError: (err: any) => void,
+        onComplete: (stats: any) => void
+    ): EventSource {
+        const { access } = getTokens();
+        const source = new EventSource(`${this.baseUrl}/cpv/sync/stream?token=${encodeURIComponent(access || '')}`);
+        
+        source.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.error) {
+                    onError(new Error(data.msg));
+                    source.close();
+                } else if (data.done) {
+                    onMessage(data.msg, data.progress);
+                    onComplete({ nuevos: data.nuevos, actualizados: data.actualizados });
+                    source.close();
+                } else {
+                    onMessage(data.msg, data.progress);
+                }
+            } catch (err) {
+                console.error("Failed to parse SSE", err);
+            }
+        };
+
+        source.onerror = (err) => {
+            onError(err);
+            source.close();
+        };
+
+        return source;
+    }
+
+    startMenoresSyncStream(
+        codi_ine10: string,
+        onMessage: (msg: string, progress: number) => void,
+        onError: (err: any) => void,
+        onComplete: (stats: any) => void
+    ): EventSource {
+        const { access } = getTokens();
+        const source = new EventSource(`${this.baseUrl}/contratos-menores/sincronizar/stream?codi_ine10=${codi_ine10}&token=${encodeURIComponent(access || '')}`);
+        
+        source.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.error) {
+                    onError(new Error(data.msg));
+                    source.close();
+                } else if (data.done) {
+                    onMessage(data.msg, data.progress);
+                    onComplete({ nous: data.nous, actualitzats: data.actualitzats });
+                    source.close();
+                } else {
+                    onMessage(data.msg, data.progress);
+                }
+            } catch (err) {
+                console.error("Failed to parse SSE", err);
+            }
+        };
+
+        source.onerror = (err) => {
+            onError(err);
+            source.close();
+        };
+
+        return source;
+    }
+
     async getProxyJson(url: string): Promise<any> {
         return this.request<any>(`/proxy-json?url=${encodeURIComponent(url)}`);
     }

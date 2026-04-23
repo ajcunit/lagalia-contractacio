@@ -13,6 +13,7 @@ from services.enrichment_service import EnrichmentService
 from fastapi import Header
 
 router = APIRouter(prefix="/contratos", tags=["contratos"])
+router_public = APIRouter(prefix="/contratos", tags=["contratos"])
 
 
 @router.get("/", response_model=List[schemas.ContratoListItem])
@@ -335,15 +336,42 @@ def export_contratos_csv(
     )
 
 
-@router.get("/enrich/stream")
+@router_public.get("/enrich/stream")
 def enrich_batch_stream(
     force: bool = False,
-    db: Session = Depends(get_db),
-    current_user: models.Empleado = Depends(get_current_user)
+    token: str = Query(..., description="JWT token for authentication (EventSource can't send headers)"),
+    db: Session = Depends(get_db)
 ):
     """Enriqueix tots els contractes en batch via SSE."""
+    from core.security import decode_access_token
+    from jose import JWTError
+    import json
+    
+    try:
+        payload = decode_access_token(token)
+        email: str = payload.get("sub")
+        if email is None:
+            return StreamingResponse(
+                iter([f'data: {json.dumps({"msg": "Token invàlid", "progress": 100, "error": True})}\n\n']),
+                media_type="text/event-stream"
+            )
+        current_user = db.query(models.Empleado).filter(models.Empleado.email == email).first()
+        if not current_user or not current_user.activo:
+            return StreamingResponse(
+                iter([f'data: {json.dumps({"msg": "Usuari no trobat o inactiu", "progress": 100, "error": True})}\n\n']),
+                media_type="text/event-stream"
+            )
+    except JWTError:
+        return StreamingResponse(
+            iter([f'data: {json.dumps({"msg": "Token invàlid o expirat", "progress": 100, "error": True})}\n\n']),
+            media_type="text/event-stream"
+        )
+
     if current_user.rol not in ["admin", "responsable_contratacion"]:
-        raise HTTPException(status_code=403, detail="No tens permissos per enriquir contractes")
+        return StreamingResponse(
+            iter([f'data: {json.dumps({"msg": "No tens permissos per enriquir contractes", "progress": 100, "error": True})}\n\n']),
+            media_type="text/event-stream"
+        )
     
     return StreamingResponse(
         EnrichmentService.enrich_batch_stream(db, force=force),
