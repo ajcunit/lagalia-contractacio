@@ -163,6 +163,10 @@ class ContratoBase(BaseModel):
     subcontractacio_permesa: Optional[bool] = None
     peu_recurs: Optional[str] = None
     possiblement_finalitzat: Optional[bool] = False
+    
+    departamentos_ids: List[int] = []
+    responsables_ids: List[int] = []
+    meses_aviso_vencimiento: Optional[int] = None
 
 
 class ContratoCreate(ContratoBase):
