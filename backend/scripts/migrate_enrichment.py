@@ -79,15 +79,105 @@ def run_migration():
             print(f'  📊 {added} columnes afegides a contratos')
     
     # 2. Crear noves taules (si no existeixen)
-    new_tables = ['criteris_adjudicacio', 'membres_mesa', 'documents_fase']
-    for table_name in new_tables:
+    all_new_tables = [
+        'criteris_adjudicacio', 'membres_mesa', 'documents_fase',
+        'contrato_departamentos', 'contrato_menor_departamentos',
+        'empleado_departamentos', 'contrato_responsables',
+        'pla_contractacio_entrades', 'proyectos_generacion', 'documentos_generacion',
+    ]
+    for table_name in all_new_tables:
         if table_name not in existing_tables:
-            Base.metadata.tables[table_name].create(engine)
-            print(f'  ✅ Creada taula: {table_name}')
+            if table_name in Base.metadata.tables:
+                Base.metadata.tables[table_name].create(engine)
+                print(f'  ✅ Creada taula: {table_name}')
+            else:
+                print(f'  ⚠️ Taula {table_name} no trobada als models')
         else:
             print(f'  ℹ️ Taula {table_name} ja existeix')
-    
+
+    # Afegir columna meses_aviso_vencimiento si no existeix
+    if 'meses_aviso_vencimiento' not in existing_columns:
+        with engine.begin() as conn:
+            try:
+                conn.execute(text('ALTER TABLE contratos ADD COLUMN meses_aviso_vencimiento INTEGER'))
+                print('  ✅ Afegida columna: contratos.meses_aviso_vencimiento')
+            except Exception as e:
+                print(f'  ⚠️ Error afegint meses_aviso_vencimiento: {e}')
+
+    # Afegir columna permiso_pla_contractacio a empleados si no existeix
+    if 'empleados' in existing_tables:
+        emp_cols = {c['name'] for c in inspector.get_columns('empleados')}
+        if 'permiso_pla_contractacio' not in emp_cols:
+            with engine.begin() as conn:
+                try:
+                    conn.execute(text('ALTER TABLE empleados ADD COLUMN permiso_pla_contractacio BOOLEAN DEFAULT FALSE'))
+                    print('  ✅ Afegida columna: empleados.permiso_pla_contractacio')
+                except Exception as e:
+                    print(f'  ⚠️ Error afegint permiso_pla_contractacio: {e}')
+
+    # 3. Migrar dades de FK departamento_id cap a taules M2M
+    _migrate_fk_to_m2m(inspector)
+
     print('\n✅ Migració completada!')
+
+
+def _migrate_fk_to_m2m(inspector):
+    """Migra les dades de departamento_id (FK antiga) a les taules M2M noves."""
+    existing_tables = inspector.get_table_names()
+    
+    migrations = [
+        {
+            'source_table': 'contratos',
+            'fk_column': 'departamento_id',
+            'm2m_table': 'contrato_departamentos',
+            'source_id_col': 'contrato_id',
+        },
+        {
+            'source_table': 'contratos_menores',
+            'fk_column': 'departamento_id',
+            'm2m_table': 'contrato_menor_departamentos',
+            'source_id_col': 'contrato_menor_id',
+        },
+        {
+            'source_table': 'empleados',
+            'fk_column': 'departamento_id',
+            'm2m_table': 'empleado_departamentos',
+            'source_id_col': 'empleado_id',
+        },
+    ]
+
+    for mig in migrations:
+        src = mig['source_table']
+        fk = mig['fk_column']
+        m2m = mig['m2m_table']
+        src_id = mig['source_id_col']
+
+        if src not in existing_tables or m2m not in existing_tables:
+            continue
+
+        src_cols = {c['name'] for c in inspector.get_columns(src)}
+        if fk not in src_cols:
+            print(f'  ℹ️ {src}.{fk} ja no existeix (migració ja feta)')
+            continue
+
+        with engine.begin() as conn:
+            # Comptar quantes files M2M ja existeixen
+            count_m2m = conn.execute(text(f'SELECT COUNT(*) FROM {m2m}')).scalar()
+            
+            # Comptar quantes files tenen departamento_id
+            count_fk = conn.execute(text(f'SELECT COUNT(*) FROM {src} WHERE {fk} IS NOT NULL')).scalar()
+
+            if count_fk > 0 and count_m2m == 0:
+                # Migrar dades de FK a M2M
+                conn.execute(text(
+                    f'INSERT INTO {m2m} ({src_id}, departamento_id) '
+                    f'SELECT id, {fk} FROM {src} WHERE {fk} IS NOT NULL'
+                ))
+                print(f'  ✅ Migrades {count_fk} relacions de {src}.{fk} → {m2m}')
+            elif count_fk > 0 and count_m2m > 0:
+                print(f'  ℹ️ {m2m} ja té {count_m2m} registres (migració ja feta)')
+            else:
+                print(f'  ℹ️ No hi ha dades a migrar per {src}.{fk}')
 
 
 if __name__ == '__main__':
