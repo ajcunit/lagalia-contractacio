@@ -269,10 +269,18 @@ Proporciona un informe executiu breu (en català) amb:
 Utilitza format Markdown."""
 
         prompt_tmpl = OllamaService.get_prompt(db, "prompt_auditoria", default_prompt)
+        # Preparar dades (convertir Decimals a float per a JSON)
+        from decimal import Decimal
+        def dec_to_float(obj):
+            if isinstance(obj, Decimal): return float(obj)
+            raise TypeError
+            
         try:
-            prompt = prompt_tmpl.format(data=json.dumps(data, indent=2, ensure_ascii=False), custom_prompt=custom_prompt or "")
-        except Exception:
-            prompt = f"{prompt_tmpl}\n\nDATA:\n{json.dumps(data, indent=2, ensure_ascii=False)}\n\n{custom_prompt or ''}"
+            data_str = json.dumps(data, indent=2, ensure_ascii=False, default=dec_to_float)
+            prompt = f"{prompt_tmpl}\n\nDATA:\n{data_str}\n\n{custom_prompt or ''}"
+        except Exception as e:
+            logger.error(f"Error serialitzant dades d'auditoria: {e}")
+            prompt = f"{prompt_tmpl}\n\nDATA: [Error de dades]\n\n{custom_prompt or ''}"
 
         think_val = OllamaService.get_think_param(db, config['model'])
         payload = {"model": config['model'], "prompt": prompt, "stream": False}
