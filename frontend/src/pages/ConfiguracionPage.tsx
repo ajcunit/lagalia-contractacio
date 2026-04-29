@@ -445,6 +445,19 @@ export default function ConfiguracionPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500">Model per Anàlisi d'Auditoria</label>
+                                        <select 
+                                            className="select select-sm select-bordered w-full"
+                                            value={configs.ollama_model_auditoria}
+                                            onChange={(e) => handleChange('ollama_model_auditoria', e.target.value)}
+                                        >
+                                            {availableModels.map(m => (
+                                                <option key={`audit-${m}`} value={m}>{m}</option>
+                                            ))}
+                                            <option value="llama3">llama3 (default)</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
                                         <label className="text-xs font-bold text-slate-500">Nivell de Raonament (Think)</label>
                                         <select 
                                             className="select select-sm select-bordered w-full"
