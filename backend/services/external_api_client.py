@@ -51,13 +51,23 @@ class ExternalAPIClient:
     async def fetch_ollama(base_url: str, endpoint: str, payload: dict = None, method: str = 'POST') -> Any:
         """Peticions HTTP a Ollama amb rate limit."""
         from core.rate_limiter import ai_api_limiter
+        import json
+        from decimal import Decimal
+
+        def decimal_default(obj):
+            if isinstance(obj, Decimal):
+                return float(obj)
+            raise TypeError
+
         async with ai_api_limiter:
             url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
             async with httpx.AsyncClient(timeout=120.0) as client:
                 if method.upper() == 'GET':
                     response = await client.get(url)
                 else:
-                    response = await client.post(url, json=payload or {})
+                    # Serialitzem manualment per controlar els Decimals
+                    content = json.dumps(payload or {}, default=decimal_default)
+                    response = await client.post(url, content=content, headers={"Content-Type": "application/json"})
                 response.raise_for_status()
                 return response.json()
 
