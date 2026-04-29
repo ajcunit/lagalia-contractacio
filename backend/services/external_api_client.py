@@ -60,14 +60,24 @@ class ExternalAPIClient:
             raise TypeError
 
         async with ai_api_limiter:
-            url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+            # Netegem la base_url per si ja porta /api
+            base = base_url.rstrip('/')
+            if base.endswith('/api'):
+                base = base[:-4].rstrip('/')
+            
+            url = f"{base}/api/{endpoint.lstrip('/')}"
+            logger.info(f"AI CALL -> {method} {url}")
+            
             async with httpx.AsyncClient(timeout=120.0) as client:
                 if method.upper() == 'GET':
                     response = await client.get(url)
                 else:
-                    # Serialitzem manualment per controlar els Decimals
                     content = json.dumps(payload or {}, default=decimal_default)
                     response = await client.post(url, content=content, headers={"Content-Type": "application/json"})
+                
+                if response.status_code == 404:
+                    logger.error(f"Ollama 404 a {url}. Revisa la URL base.")
+                    
                 response.raise_for_status()
                 return response.json()
 
