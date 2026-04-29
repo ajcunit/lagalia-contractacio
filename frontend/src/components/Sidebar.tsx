@@ -21,6 +21,7 @@ import {
     Shield,
     ClipboardList,
     Layers,
+    ClipboardCheck,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -69,6 +70,9 @@ export default function Sidebar() {
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/contratacion', icon: FileText, label: 'Contractació' },
+        ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable'
+            ? [{ path: '/revisions', icon: ClipboardCheck, label: 'Revisions' }]
+            : []),
         ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' 
             ? (pendientes > 0 ? [{ path: '/duplicados', icon: AlertTriangle, label: 'Duplicats', badge: pendientes }] : []) 
             : []),
@@ -94,12 +98,12 @@ export default function Sidebar() {
             <div className="h-16 flex items-center justify-center border-b border-slate-100 px-4">
                 {!collapsed && (
                     <div className="flex flex-col items-center w-full">
-                        <h1 className="font-bold text-slate-800 tracking-tight text-2xl">Licit<span className="text-primary-600">IA</span></h1>
-                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-1">Gestió Intel·ligent</p>
+                        <h1 className="font-bold text-slate-800 tracking-tight text-2xl">LAGAL<span className="text-primary-600">ia</span></h1>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-1">Contractació</p>
                     </div>
                 )}
                 {collapsed && (
-                    <div className="font-bold text-primary-600 text-xl">L</div>
+                    <div className="font-bold text-primary-600 text-xl">Lg</div>
                 )}
             </div>
 

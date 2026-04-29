@@ -5,7 +5,7 @@ export interface PPTDocument {
     url: string;
     titol: string;
     expedient: string;
-    origen: 'Licitia' | 'SuperBuscador';
+    origen: 'LAGALia' | 'SuperBuscador';
 }
 
 interface PPTContextType {

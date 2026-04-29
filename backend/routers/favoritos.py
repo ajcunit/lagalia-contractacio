@@ -163,6 +163,7 @@ async def add_favorito_by_expediente(carpeta_id: int, request: schemas.ContratoF
                 model_data = SyncService.map_api_to_model(api_record)
                 model_data["datos_json"] = api_record
                 model_data["hash_contenido"] = SyncService.calculate_hash(api_record)
+                model_data["origen"] = "extern"  # Marcar com extern perquè no aparegui al mòdul de contractes
                 db_contrato = models.Contrato(**model_data)
                 db.add(db_contrato)
                 db.commit()

@@ -149,13 +149,18 @@ export default function PlaContractacio() {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
         try {
             await api.deletePlaEntrada(id);
             setDeleteConfirm(null);
+            // Actualitzem l'estat localment per a una resposta immediata
+            setEntrades(prev => prev.filter(e => e.id !== id));
+            // Opcionalment recarreguem per assegurar consistència total
             loadData();
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            window.alert("Error en esborrar l'entrada: " + (err.message || "Error desconegut"));
         }
     };
 
@@ -175,9 +180,11 @@ export default function PlaContractacio() {
     const handleApprove = async (id: number) => {
         try {
             await api.updatePlaEntrada(id, { estat: 'aprovat' });
-            loadData();
+            setEntrades(prev => prev.map(e => e.id === id ? { ...e, estat: 'aprovat' } : e));
+            // No cal loadData() si ja hem actualitzat l'estat local
         } catch (err) {
             console.error(err);
+            window.alert("Error en aprovar l'entrada");
         }
     };
 
@@ -312,7 +319,7 @@ export default function PlaContractacio() {
                                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                                                                     {isAdmin && row.estat === 'pendent' && (
                                                                         <button
-                                                                            onClick={() => handleApprove(row.id)}
+                                                                            onClick={(e) => { e.stopPropagation(); handleApprove(row.id); }}
                                                                             className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200 text-[10px] font-bold transition-colors mr-1"
                                                                             title="Aprovar"
                                                                         >
@@ -320,21 +327,21 @@ export default function PlaContractacio() {
                                                                         </button>
                                                                     )}
                                                                     <button
-                                                                        onClick={() => openEdit(row)}
+                                                                        onClick={(e) => { e.stopPropagation(); openEdit(row); }}
                                                                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-indigo-100 text-slate-400 hover:text-indigo-600 transition-colors"
                                                                     >
                                                                         <Pencil size={13} />
                                                                     </button>
                                                                     {deleteConfirm === row.id ? (
                                                                         <button
-                                                                            onClick={() => handleDelete(row.id)}
+                                                                            onClick={(e) => handleDelete(e, row.id)}
                                                                             className="h-7 px-2 text-[10px] bg-red-500 text-white rounded-lg font-bold"
                                                                         >
                                                                             Confirmar
                                                                         </button>
                                                                     ) : (
                                                                         <button
-                                                                            onClick={() => setDeleteConfirm(row.id)}
+                                                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(row.id); }}
                                                                             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
                                                                         >
                                                                             <Trash2 size={13} />
@@ -377,7 +384,7 @@ export default function PlaContractacio() {
                                                                 {c.import_adjudicacio ? formatCurrency(c.import_adjudicacio) : '—'}
                                                             </td>
                                                             <td className="px-3 py-2.5 text-[10px] text-amber-700 font-semibold whitespace-nowrap">
-                                                                {c.data_finalitzacio ? new Date(c.data_finalitzacio).toLocaleDateString('ca-ES', { day: '2-digit', month: 'short' }) : ''}
+                                                                {c.data_finalitzacio ? new Date(c.data_finalitzacio).toLocaleDateString('ca-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}
                                                             </td>
                                                             <td className="px-3 py-2.5">
                                                                 <Link

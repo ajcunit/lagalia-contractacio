@@ -75,6 +75,8 @@ def update_config(
     
     if clave == 'dashboard_mesos_caducitat':
         import services.alerta_service as alerta_service
+        import logging
+        logging.getLogger(__name__).info(f"Canvi de configuració detectat: {clave}={cfg.valor}. Llançant recàlcul d'alertes.")
         alerta_service.update_and_notify_expirations(db)
         
     db.refresh(cfg)

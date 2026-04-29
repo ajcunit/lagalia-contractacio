@@ -270,16 +270,74 @@ export default function ContratoDetalle() {
         }
     };
 
+    const [finalitzantAction, setFinalitzantAction] = useState(false);
+
+    const handleFinalitzarDetall = async () => {
+        if (!contrato || !id) return;
+        if (!window.confirm(`Confirmes que el contracte ${contrato.codi_expedient} està realment finalitzat?`)) return;
+        try {
+            setFinalitzantAction(true);
+            await api.finalitzarContrato(parseInt(id));
+            await loadContrato(parseInt(id));
+        } catch (err: any) {
+            alert(err.message || 'Error al finalitzar');
+        } finally {
+            setFinalitzantAction(false);
+        }
+    };
+
+    const handleDescartarDetall = async () => {
+        if (!contrato || !id) return;
+        if (!window.confirm(`Descartar l'alerta de finalització per ${contrato.codi_expedient}?`)) return;
+        try {
+            setFinalitzantAction(true);
+            await api.descartarFinalitzacio(parseInt(id));
+            await loadContrato(parseInt(id));
+        } catch (err: any) {
+            alert(err.message || "Error al descartar l'alerta");
+        } finally {
+            setFinalitzantAction(false);
+        }
+    };
+
+    const canManageContract = user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable';
+
     const getExpirationAlert = () => {
         if (!contrato) return null;
         if (contrato.possiblement_finalitzat) {
             return (
-                <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-                    <AlertCircle className="text-red-600" size={24} />
-                    <div>
-                        <p className="font-medium text-red-800">Possiblement Finalitzat</p>
-                        <p className="text-sm text-red-600">La data de finalització calculada ha passat.</p>
+                <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="text-red-600 flex-shrink-0" size={24} />
+                        <div>
+                            <p className="font-medium text-red-800">Possiblement Finalitzat</p>
+                            <p className="text-sm text-red-600">La data de finalització calculada ha passat.</p>
+                        </div>
                     </div>
+                    {canManageContract && (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                                onClick={handleFinalitzarDetall}
+                                disabled={finalitzantAction}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                            >
+                                {finalitzantAction ? (
+                                    <div className="w-3.5 h-3.5 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                    <Check size={14} />
+                                )}
+                                Finalitzar
+                            </button>
+                            <button
+                                onClick={handleDescartarDetall}
+                                disabled={finalitzantAction}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
+                            >
+                                <X size={14} />
+                                Descartar
+                            </button>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -1303,7 +1361,7 @@ export default function ContratoDetalle() {
                                                             url: d.url_descarrega!,
                                                             titol: d.titol || 'Document',
                                                             expedient: contrato?.codi_expedient || 'Desconegut',
-                                                            origen: 'Licitia'
+                                                            origen: 'LAGALia'
                                                         });
                                                     }}
                                                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors text-xs font-black uppercase tracking-wider"

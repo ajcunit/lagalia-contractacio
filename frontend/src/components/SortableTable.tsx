@@ -52,9 +52,12 @@ export function useSortableData<T>(items: T[], defaultSort?: SortConfig) {
 
     const requestSort = (key: string) => {
         setSortConfig((prev) => {
-            if (prev.key !== key) return { key, direction: 'asc' };
-            if (prev.direction === 'asc') return { key, direction: 'desc' };
-            return { key: '', direction: null }; // reset
+            if (prev.key !== key) {
+                // For dates or amounts, default to desc on first click is often better, 
+                // but let's stick to a consistent toggle.
+                return { key, direction: 'desc' };
+            }
+            return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
         });
     };
 

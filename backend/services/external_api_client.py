@@ -19,7 +19,7 @@ ALLOWED_PROXY_DOMAINS = [
 ]
 
 DEFAULT_TIMEOUT = 30.0
-DEFAULT_HEADERS = {"User-Agent": "LicitIA/2.0"}
+DEFAULT_HEADERS = {"User-Agent": "LAGALia-Contractacio/2.0"}
 
 
 class ExternalAPIClient:

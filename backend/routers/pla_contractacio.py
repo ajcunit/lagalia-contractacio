@@ -4,8 +4,9 @@ Accés: admin, responsable_contratacion i usuaris amb permiso_pla_contractacio.
 """
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 from core.database import get_db
 import models, schemas
@@ -203,13 +204,13 @@ def get_contractes_caducant(
     check_pla_permission(current_user)
     year = any_exercici or datetime.now().year
 
-    from datetime import date
-    year_start = datetime(year, 1, 1)
-    year_end = datetime(year, 12, 31, 23, 59, 59)
-
+    from dateutil.relativedelta import relativedelta
+    
+    # Eliminem el filtre de data inicial per permetre que el càlcul en Python 
+    # trobi qualsevol contracte que tingui l'avís en l'any demanat.
     query = db.query(models.Contrato).filter(
-        models.Contrato.data_finalitzacio_calculada >= year_start,
-        models.Contrato.data_finalitzacio_calculada <= year_end,
+        func.coalesce(models.Contrato.origen, 'local') == 'local',
+        func.coalesce(models.Contrato.tipus_contracte, '') != 'Obres',
         models.Contrato.data_finalitzacio_calculada.isnot(None),
     )
 
@@ -217,25 +218,44 @@ def get_contractes_caducant(
     from services.access_control import apply_department_filter
     query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
 
-    contratos = query.order_by(models.Contrato.data_finalitzacio_calculada.asc()).all()
+    contratos_raw = query.all()
 
-    def trimestre_from_date(d: datetime) -> int:
+    def trimestre_from_date(d: date) -> int:
         return (d.month - 1) // 3 + 1
 
-    result = []
-    for c in contratos:
-        t = trimestre_from_date(c.data_finalitzacio_calculada)
-        result.append({
-            "id": c.id,
-            "trimestre": t,
-            "codi_expedient": c.codi_expedient,
-            "objecte_contracte": c.objecte_contracte,
-            "adjudicatari_nom": c.adjudicatari_nom,
-            "tipus_contracte": c.tipus_contracte,
-            "data_finalitzacio": str(c.data_finalitzacio_calculada) if c.data_finalitzacio_calculada else None,
-            "import_adjudicacio": float(c.import_adjudicacio_amb_iva) if c.import_adjudicacio_amb_iva else None,
-            "estat_actual": c.estat_actual,
-            "departament": c.departament_adjudicador,
-        })
+    # Get default alert configuration
+    config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
+    default_meses = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
 
+    result = []
+    for c in contratos_raw:
+        # Calcular data d'avís: data_finalitzacio - meses_aviso
+        mesos_aviso = c.meses_aviso_vencimiento if c.meses_aviso_vencimiento is not None else default_meses
+        df = c.data_finalitzacio_calculada
+        
+        # Assegurar que és objecte date
+        if isinstance(df, datetime):
+            df = df.date()
+        
+        data_avis = df - relativedelta(months=mesos_aviso)
+        
+        # Només incorporem si la data d'avís cau en l'any que estem consultant
+        if data_avis.year == year:
+            t = trimestre_from_date(data_avis)
+            result.append({
+                "id": c.id,
+                "trimestre": t,
+                "codi_expedient": c.codi_expedient,
+                "objecte_contracte": c.objecte_contracte,
+                "adjudicatari_nom": c.adjudicatari_nom,
+                "tipus_contracte": c.tipus_contracte,
+                "data_finalitzacio": str(c.data_finalitzacio_calculada) if c.data_finalitzacio_calculada else None,
+                "data_avis_incorporacio": str(data_avis),
+                "import_adjudicacio": float(c.import_adjudicacio_amb_iva) if c.import_adjudicacio_amb_iva else None,
+                "estat_actual": c.estat_actual,
+                "departament": c.departament_adjudicador,
+            })
+
+    # Ordenar per trimestre i data d'avís
+    result.sort(key=lambda x: (x['trimestre'], x['data_avis_incorporacio']))
     return result

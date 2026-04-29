@@ -26,6 +26,7 @@ import Login from './pages/Login';
 import SetupWizard from './pages/SetupWizard';
 import ProtectedRoute from './components/ProtectedRoute';
 import PlaContractacio from './pages/PlaContractacio';
+import Revisions from './pages/Revisions';
 
 import GeneradorPPT from './pages/GeneradorPPT';
 import { PPTProvider } from './context/PPTContext';
@@ -60,6 +61,7 @@ function App() {
                             <Route path="adjudicatarios/:nombre" element={<AdjudicatarioDetalle />} />
                             <Route path="auditoria" element={<Auditoria />} />
                             <Route path="pla-contractacio" element={<PlaContractacio />} />
+                            <Route path="revisions" element={<Revisions />} />
                             <Route path="configuracion" element={<ConfiguracionPage />} />
                             <Route path="credits" element={<Credits />} />
                             <Route path="contratos-menores" element={<ContratosMenores />} />

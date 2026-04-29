@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Optional, Generator
 from sqlalchemy.orm import Session
 import json
+import services.alerta_service as alerta_service
 
 import models
 
@@ -406,6 +407,12 @@ class EnrichmentService:
                 setattr(contrato, field, value)
                 stats["camps_actualitzats"] += 1
         
+        # Sincronitzem dades de finalització si n'hem trobat de noves
+        if "data_fi_execucio" in scalar_fields:
+            new_date = scalar_fields["data_fi_execucio"]
+            contrato.data_final = new_date
+            contrato.data_finalitzacio_calculada = new_date
+
         # 2. Criteris d'adjudicació (buscar a la fase amb més info)
         criteris = []
         for fase_nom in ["licitacio", "adjudicacio", "formalitzacio"]:
@@ -472,6 +479,10 @@ class EnrichmentService:
         
         # Marcar com a enriquit
         contrato.fecha_enriquiment = datetime.now()
+        
+        # Recalcular alertes immediatament
+        alerta_service.update_and_notify_expirations(db)
+        
         db.commit()
         
         logger.info(f"Contracte {contrato.codi_expedient} enriquit: {stats}")
@@ -495,8 +506,10 @@ class EnrichmentService:
         if contrato_ids:
             query = query.filter(models.Contrato.id.in_(contrato_ids))
         else:
-            # Només contractes que tenen almenys un URL de fase
+            # Només contractes locals que tenen almenys un URL de fase
+            from sqlalchemy import func as sa_func
             query = query.filter(
+                sa_func.coalesce(models.Contrato.origen, 'local') == 'local',
                 (models.Contrato.url_json_licitacio != None) |
                 (models.Contrato.url_json_avaluacio != None) |
                 (models.Contrato.url_json_adjudicacio != None) |

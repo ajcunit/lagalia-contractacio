@@ -2,6 +2,7 @@ import logging
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import models
 
 logger = logging.getLogger(__name__)
@@ -9,14 +10,18 @@ logger = logging.getLogger(__name__)
 def update_and_notify_expirations(db: Session):
     config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
     default_meses = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
+    
+    logger.info(f"Actualitzant alertes de venciment. Mesos per defecte: {default_meses}")
 
     hoy = date.today()
     
-    # Check all active contracts
+    # Check all active LOCAL contracts (exclude external/superbuscador ones)
     contratos = db.query(models.Contrato).filter(
-        models.Contrato.data_final.isnot(None),
-        models.Contrato.possiblement_finalitzat == False
+        func.coalesce(models.Contrato.origen, 'local') == 'local',
+        models.Contrato.data_final.isnot(None)
     ).all()
+    
+    logger.info(f"S'han trobat {len(contratos)} contractes locals amb data de finalització per processar.")
 
     for contrato in contratos:
         meses_aviso = contrato.meses_aviso_vencimiento if contrato.meses_aviso_vencimiento is not None else default_meses
@@ -32,6 +37,8 @@ def update_and_notify_expirations(db: Session):
                 contrato.possiblement_finalitzat = True
                 contrato.alerta_finalitzacio = False
         else:
+            # Not finished yet
+            contrato.possiblement_finalitzat = False
             es_alerta = (hoy <= df <= limite_aviso)
             if es_alerta and not contrato.alerta_finalitzacio:
                 contrato.alerta_finalitzacio = True
@@ -39,7 +46,9 @@ def update_and_notify_expirations(db: Session):
             elif not es_alerta and contrato.alerta_finalitzacio:
                 contrato.alerta_finalitzacio = False
                 
+    
     db.commit()
+    logger.info("Recàlcul d'alertes finalitzat correctament.")
 
 def send_expiration_emails(contrato: models.Contrato):
     # This is where the email system integration goes.

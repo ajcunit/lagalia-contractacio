@@ -115,7 +115,7 @@ class SyncService:
             return None
     
     @staticmethod
-    def map_api_to_model(data: dict, aliases: dict = None) -> dict:
+    def map_api_to_model(data: dict, aliases: dict = None, mesos_alerta: int = 6) -> dict:
         """Map API fields to model fields"""
         from datetime import date
         from dateutil.relativedelta import relativedelta
@@ -134,8 +134,8 @@ class SyncService:
                 if hasattr(data_finalitzacio, 'date'):
                     data_finalitzacio = data_finalitzacio.date()
                 today = date.today()
-                six_months_later = today + relativedelta(months=6)
-                if today <= data_finalitzacio <= six_months_later:
+                limite_alerta = today + relativedelta(months=int(mesos_alerta))
+                if today <= data_finalitzacio <= limite_alerta:
                     alerta = True
                 if data_finalitzacio < today:
                     possiblement_finalitzat = True
@@ -182,7 +182,7 @@ class SyncService:
             "data_formalitzacio": data_formalitzacio,  # API field: data_formalitzacio_contracte
             "durada_contracte": durada,  # API field: durada_contracte
             "data_finalitzacio_calculada": data_finalitzacio,  # Calculated (same as data_final)
-            "alerta_finalitzacio": alerta,  # True if ends within 6 months
+            "alerta_finalitzacio": alerta,  # True si acaba en els mesos configurats
             "possiblement_finalitzat": possiblement_finalitzat,  # True if already passed
             "data_anunci_previ": SyncService.parse_date(data.get("data_anunci_previ")),
             "data_anunci_licitacio": SyncService.parse_date(data.get("data_anunci_licitacio")),
@@ -300,6 +300,11 @@ class SyncService:
             aliases = {a.nombre_original: a.nombre_canonico for a in db.query(models.AliasAdjudicatario).all()}
             
             yield f'data: {json.dumps({"msg": "Descarregant contractes del registre públic...", "progress": 10})}\n\n'
+            
+            # Get alert configuration
+            config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
+            mesos_alerta = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
+            
             data = SyncService.fetch_data(db, codi_ine10)
             
             total_records = len(data)
@@ -327,7 +332,7 @@ class SyncService:
                         continue
                         
                     record_hash = SyncService.calculate_hash(record)
-                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases)
+                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases, mesos_alerta=mesos_alerta)
                     mapped_data["hash_contenido"] = record_hash
                     
                     existing = db.query(models.Contrato).filter(
@@ -451,6 +456,11 @@ class SyncService:
         
         try:
             logger.info("Fetching data from API...")
+            
+            # Get alert configuration
+            config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
+            mesos_alerta = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
+            
             data = SyncService.fetch_data(db, codi_ine10)
             logger.info(f"Fetched {len(data)} records")
             sync.total_registros_api = len(data)
@@ -473,7 +483,7 @@ class SyncService:
                         continue
                     
                     record_hash = SyncService.calculate_hash(record)
-                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases)
+                    mapped_data = SyncService.map_api_to_model(record, aliases=aliases, mesos_alerta=mesos_alerta)
                     mapped_data["hash_contenido"] = record_hash
                     
                     # Look for existing contract
@@ -667,22 +677,14 @@ class SyncService:
                                     
                                 # Update contract's calculated end date
                                 if d_fi:
-                                    cf = contrato.data_fi_execucio or contrato.data_final
-                                    if cf and hasattr(cf, 'date'): cf = cf.date()
+                                    # Sincronitzem dades de finalització
+                                    # Això assegura que surti al Pla de Contractació
+                                    contrato.data_final = d_fi
+                                    contrato.data_fi_execucio = d_fi
+                                    contrato.data_finalitzacio_calculada = d_fi
                                     
-                                    # Si la prorroga estén el contracte, actualitzem les dates i alertes
-                                    if cf is None or d_fi > cf:
-                                        contrato.data_final = d_fi
-                                        contrato.data_fi_execucio = d_fi
-                                        contrato.data_finalitzacio_calculada = d_fi
-                                        
-                                        # Recalcular alertes
-                                        today = date_type.today()
-                                        six_months_later = today + relativedelta(months=6)
-                                        
-                                        contrato.possiblement_finalitzat = d_fi < today
-                                        contrato.alerta_finalitzacio = today <= d_fi <= six_months_later
                             elif "modificaci" in situacio:
+                                # ... (modificacions logic)
                                 num_mod = SyncService.parse_int(record.get("numero_modificacio"))
                                 if num_mod is None: continue
                                 
@@ -725,12 +727,8 @@ class SyncService:
                                     db.add(modificacion)
                                     stats["modificacions_noves"] += 1
                         
-                        # Recalculate alerts
-                        if contrato.data_final:
-                            df = contrato.data_final
-                            if hasattr(df, 'date'): df = df.date()
-                            contrato.possiblement_finalitzat = df < today
-                            contrato.alerta_finalitzacio = (today <= df <= six_months)
+                        # Recalcular alertes immediatament
+                        alerta_service.update_and_notify_expirations(db)
                         
                     db.commit()
                 except Exception as e:

@@ -1,5 +1,5 @@
 """
-LicitIA v2 — Main Application
+LAGALia Contractació — Main Application
 Seguretat per disseny: cap secret hardcoded, rate limiting, security headers.
 """
 from fastapi import FastAPI, HTTPException, Depends
@@ -69,6 +69,10 @@ def run_migrations():
             empleado_id INTEGER NOT NULL REFERENCES empleados(id) ON DELETE CASCADE,
             PRIMARY KEY (contrato_id, empleado_id)
         )""",
+        # v2.2 — Separar contractes externs (superbuscador) dels locals (ajuntament)
+        "ALTER TABLE contratos ADD COLUMN IF NOT EXISTS origen VARCHAR(20) DEFAULT 'local'",
+        "UPDATE contratos SET origen = 'local' WHERE origen IS NULL",
+        "CREATE INDEX IF NOT EXISTS ix_contratos_origen ON contratos (origen)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

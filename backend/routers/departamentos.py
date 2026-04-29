@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from core.database import get_db
 import models
@@ -111,5 +112,6 @@ def get_departamento_contratos(
     if not dept:
         raise HTTPException(status_code=404, detail="Departamento no encontrado")
     return db.query(models.Contrato).filter(
+        func.coalesce(models.Contrato.origen, 'local') == 'local',
         models.Contrato.departamentos.any(models.Departamento.id == departamento_id)
     ).order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()

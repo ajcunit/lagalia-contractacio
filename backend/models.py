@@ -112,7 +112,7 @@ class Contrato(Base):
     # Duración y finalización
     durada_contracte = Column(Integer)  # Durada en mesos
     data_finalitzacio_calculada = Column(Date, index=True)  # Data formalització + durada
-    alerta_finalitzacio = Column(Boolean, default=False)  # True si acaba en 6 mesos
+    alerta_finalitzacio = Column(Boolean, default=False)  # True si acaba properament (configurable)
     possiblement_finalitzat = Column(Boolean, default=False)  # True si ja ha passat la data
     meses_aviso_vencimiento = Column(Integer, nullable=True) # Avis individual en mesos
     
@@ -213,6 +213,7 @@ class Contrato(Base):
 
     # Control interno
     estado_interno = Column(String(50), default='normal', index=True)
+    origen = Column(String(20), default='local', index=True)  # 'local' = ajuntament, 'extern' = superbuscador
     datos_json = Column(JSON)
     hash_contenido = Column(String(32), index=True)
     fecha_primera_sincronizacion = Column(DateTime, server_default=func.now())

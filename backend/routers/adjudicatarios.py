@@ -54,7 +54,7 @@ def get_adjudicatarios(
     WITH combined AS (
         SELECT adjudicatari_nom as nombre, import_adjudicacio_amb_iva as importe, adjudicatari_nif as nif
         FROM contratos
-        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter_major}
+        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' AND COALESCE(origen, 'local') = 'local' {dept_filter_major}
         
         UNION ALL
         
@@ -85,7 +85,7 @@ def get_adjudicatarios(
     WITH combined AS (
         SELECT adjudicatari_nom as nombre
         FROM contratos
-        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' {dept_filter_major}
+        WHERE adjudicatari_nom IS NOT NULL AND adjudicatari_nom != '' AND COALESCE(origen, 'local') = 'local' {dept_filter_major}
         
         UNION
         
@@ -140,7 +140,7 @@ def get_adjudicatario_detalle(
     query = f"""
     SELECT id, codi_expedient, objecte_contracte as descripcion, import_adjudicacio_amb_iva as importe, 'major' as tipo_registro, data_inici as fecha, estat_actual as estado
     FROM contratos
-    WHERE adjudicatari_nom = :nombre {dept_filter_major}
+    WHERE adjudicatari_nom = :nombre AND COALESCE(origen, 'local') = 'local' {dept_filter_major}
     
     UNION ALL
     
@@ -156,7 +156,7 @@ def get_adjudicatario_detalle(
     total_importe = sum((r['importe'] or 0) for r in results)
     
     # We also might want the NIF if it's available in the major contracts
-    nif_query = "SELECT adjudicatari_nif FROM contratos WHERE adjudicatari_nom = :nombre AND adjudicatari_nif IS NOT NULL LIMIT 1"
+    nif_query = "SELECT adjudicatari_nif FROM contratos WHERE adjudicatari_nom = :nombre AND COALESCE(origen, 'local') = 'local' AND adjudicatari_nif IS NOT NULL LIMIT 1"
     nif_result = db.execute(text(nif_query), {"nombre": nombre}).scalar()
     
     return {

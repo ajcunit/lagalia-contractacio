@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_EXTERNAL_PROXY: str = "10/minute"
 
     # === App ===
-    APP_NAME: str = "LicitIA"
+    APP_NAME: str = "LAGALia Contractació"
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
 

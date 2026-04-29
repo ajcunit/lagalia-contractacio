@@ -33,8 +33,8 @@ export default function Login() {
                     style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}>
                 </div>
                 <div className="relative z-10 flex flex-col h-full items-start justify-center">
-                    <h1 className="text-8xl font-black text-white mb-6 leading-tight tracking-tighter">Licit<span className="text-primary-500">IA</span></h1>
-                    <p className="text-xl text-slate-400 max-w-sm font-light">L'assistent intel·ligent per a la gestió, anàlisi i control de processos de contractació pública.</p>
+                    <h1 className="text-8xl font-black text-white mb-6 leading-tight tracking-tighter">LAGAL<span className="text-primary-500">ia</span></h1>
+                    <p className="text-xl text-slate-400 max-w-sm font-light">Gestió intel·ligent, anàlisi i control de processos de contractació pública.</p>
                 </div>
             </div>
 
@@ -43,9 +43,9 @@ export default function Login() {
                 <div className="max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div className="text-center mb-10">
                         <div className="lg:hidden flex justify-center mb-6">
-                            <h1 className="text-4xl font-black text-slate-800 tracking-tighter">Licit<span className="text-primary-600">IA</span></h1>
+                            <h1 className="text-4xl font-black text-slate-800 tracking-tighter">LAGAL<span className="text-primary-600">ia</span></h1>
                         </div>
-                        <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 mb-2 font-display">Bentornat a LicitIA</h2>
+                        <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 mb-2 font-display">Bentornat a LAGALia</h2>
                         <p className="text-slate-500">Sincronitza i gestiona els teus contractes amb l'ajuda de la IA.</p>
                     </div>
 

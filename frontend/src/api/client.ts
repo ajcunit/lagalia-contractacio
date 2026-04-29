@@ -28,6 +28,7 @@ export interface ContratoListItem {
     objecte_contracte?: string;
     adjudicatari_nom?: string;
     import_adjudicacio_amb_iva?: number;
+    data_publicacio?: string;
     data_inici?: string;
     estat_actual?: string;
     estado_interno: string;
@@ -273,6 +274,15 @@ export interface DashboardStats {
         data_finalitzacio?: string;
         importe: number;
     }>;
+    contractes_finalitzats_pendents: Array<{
+        id: number;
+        codi_expedient: string;
+        objecte: string;
+        adjudicatari?: string;
+        data_finalitzacio?: string;
+        importe: number;
+        estat_actual?: string;
+    }>;
 }
 
 export interface FiltroOpciones {
@@ -473,10 +483,11 @@ class ApiClient {
                 const retryResponse = await this._fetch(endpoint, options);
                 if (!retryResponse.ok) {
                     if (retryResponse.status === 401) this._handleLogout();
-                    const error = await retryResponse.json().catch(() => ({}));
+                    const error = await retryResponse.text().then(t => t ? JSON.parse(t) : {}).catch(() => ({}));
                     throw new Error(error.detail || `Error HTTP: ${retryResponse.status}`);
                 }
-                return retryResponse.json();
+                const text = await retryResponse.text();
+                return text ? JSON.parse(text) : {} as T;
             } else {
                 this._handleLogout();
                 throw new Error('Sessió expirada');
@@ -484,11 +495,17 @@ class ApiClient {
         }
 
         if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
+            const error = await response.text().then(t => t ? JSON.parse(t) : {}).catch(() => ({}));
             const msg = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail || error);
             throw new Error(msg || `Error HTTP: ${response.status}`);
         }
-        return response.json();
+
+        if (response.status === 204) {
+            return {} as T;
+        }
+
+        const text = await response.text();
+        return text ? JSON.parse(text) : {} as T;
     }
 
     // ===== Setup =====
@@ -684,6 +701,18 @@ class ApiClient {
 
     async enrichContrato(contratoId: number): Promise<{ message: string; stats: any }> {
         return this.request<{ message: string; stats: any }>(`/contratos/${contratoId}/enrich`, {
+            method: 'POST',
+        });
+    }
+
+    async finalitzarContrato(contratoId: number): Promise<{ message: string }> {
+        return this.request<{ message: string }>(`/contratos/${contratoId}/finalitzar`, {
+            method: 'POST',
+        });
+    }
+
+    async descartarFinalitzacio(contratoId: number): Promise<{ message: string }> {
+        return this.request<{ message: string }>(`/contratos/${contratoId}/descartar-finalitzacio`, {
             method: 'POST',
         });
     }
@@ -997,9 +1026,12 @@ class ApiClient {
         });
     }
 
-    async searchCpvs(q: string, nivel?: string): Promise<CPV[]> {
-        const params = new URLSearchParams({ q });
+    async searchCpvs(q?: string, nivel?: string, padre?: string, limit: number = 50): Promise<CPV[]> {
+        const params = new URLSearchParams();
+        if (q) params.append('q', q);
         if (nivel) params.append('nivel', nivel);
+        if (padre) params.append('padre', padre);
+        params.append('limit', String(limit));
         return this.request<CPV[]>(`/cpv/search?${params.toString()}`);
     }
 

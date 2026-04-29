@@ -39,8 +39,18 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
 
     const page = Number(urlParams.get('page')) || 0;
     const limit = Number(urlParams.get('limit')) || 50;
+    const sort = urlParams.get('sort') || 'data_publicacio';
+    const order = (urlParams.get('order') as 'asc' | 'desc') || 'desc';
 
-    const { sortedItems: contratos, sortConfig, requestSort } = useSortableData(contratosRaw);
+    const { sortedItems: contratos } = useSortableData(contratosRaw, { key: sort, direction: order });
+
+    // Custom sort handler that updates the URL
+    const handleRequestSort = (key: string) => {
+        const nextOrder = (sort === key && order === 'desc') ? 'asc' : 'desc';
+        updateURL({ sort: key, order: nextOrder, page: '0' });
+    };
+
+    const sortConfig = { key: sort, direction: order };
 
     useEffect(() => {
         loadDepartamentos();
@@ -90,6 +100,8 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                 tipus_contracte: searchState.tipus_contracte,
                 estado_interno: searchState.estado_interno,
                 adjudicatari_nom: searchState.adjudicatari_nom,
+                sort: sort,
+                order: order
             };
 
             if (searchState.departamento_id) params.departamento_id = parseInt(searchState.departamento_id);
@@ -345,12 +357,13 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                                             <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-600 cursor-pointer" checked={contratos.length > 0 && selectedContracts.size === contratos.length} onChange={toggleAllContracts} />
                                         </th>
                                     )}
-                                    <SortableTh label="Expedient" sortKey="codi_expedient" sortConfig={sortConfig} onSort={requestSort} />
-                                    <SortableTh label="Objecte" sortKey="objecte_contracte" sortConfig={sortConfig} onSort={requestSort} />
-                                    <SortableTh label="Adjudicatari" sortKey="adjudicatari_nom" sortConfig={sortConfig} onSort={requestSort} />
+                                    <SortableTh label="Expedient" sortKey="codi_expedient" sortConfig={sortConfig} onSort={handleRequestSort} />
+                                    <SortableTh label="Publicació" sortKey="data_publicacio" sortConfig={sortConfig} onSort={handleRequestSort} />
+                                    <SortableTh label="Objecte" sortKey="objecte_contracte" sortConfig={sortConfig} onSort={handleRequestSort} />
+                                    <SortableTh label="Adjudicatari" sortKey="adjudicatari_nom" sortConfig={sortConfig} onSort={handleRequestSort} />
                                     <th className="px-4 py-3 bg-slate-50 border-b border-slate-100 text-[11px] uppercase font-bold text-slate-500 tracking-wider text-center">Atributs</th>
-                                    <SortableTh label="Import" sortKey="import_adjudicacio_amb_iva" sortConfig={sortConfig} onSort={requestSort} />
-                                    <SortableTh label="Fase" sortKey="estat_actual" sortConfig={sortConfig} onSort={requestSort} />
+                                    <SortableTh label="Import" sortKey="import_adjudicacio_amb_iva" sortConfig={sortConfig} onSort={handleRequestSort} />
+                                    <SortableTh label="Fase" sortKey="estat_actual" sortConfig={sortConfig} onSort={handleRequestSort} />
                                     <th className="px-4 py-3 bg-slate-50 border-b border-slate-100"></th>
                                 </tr>
                             </thead>
@@ -375,6 +388,9 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                                                 </div>
                                                 {contrato.departamentos && contrato.departamentos.length > 0 && <div className="text-[10px] text-primary-600 font-bold uppercase tracking-tight">{contrato.departamentos.map(d => d.nombre).join(', ')}</div>}
                                             </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-600 text-[13px] whitespace-nowrap">
+                                            {contrato.data_publicacio ? new Date(contrato.data_publicacio).toLocaleDateString('ca-ES') : '-'}
                                         </td>
                                         <td className="px-4 py-3">
                                             <span 

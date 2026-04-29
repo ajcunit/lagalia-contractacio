@@ -80,7 +80,7 @@ export default function SetupWizard() {
                             <Shield className="text-white" size={40} />
                         </div>
                         <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight">
-                            Benvingut a Licit<span className="text-blue-600">IA</span>
+                            Benvingut a LAGAL<span className="text-blue-600">ia</span>
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-lg">
                             Sistema de gestió intel·ligent de contractació pública. 
@@ -224,7 +224,7 @@ export default function SetupWizard() {
                             Tot llest! 🎉
                         </h2>
                         <p className="text-slate-500 dark:text-slate-400">
-                            LicitIA s'ha configurat correctament. Ja pots iniciar sessió.
+                            LAGALia Contractació s'ha configurat correctament. Ja pots iniciar sessió.
                         </p>
                         <button
                             onClick={() => navigate('/login')}

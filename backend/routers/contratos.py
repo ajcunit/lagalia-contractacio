@@ -36,11 +36,13 @@ def list_contratos(
     alerta_finalitzacio: Optional[bool] = None,
     possiblement_finalitzat: Optional[bool] = None,
     sense_departament: Optional[bool] = None,
+    sort: str = "data_publicacio",
+    order: str = "desc",
     db: Session = Depends(get_db),
     current_user: models.Empleado = Depends(get_current_user),
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
-    query = db.query(models.Contrato)
+    query = db.query(models.Contrato).filter(func.coalesce(models.Contrato.origen, 'local') == 'local')
     query = apply_department_filter(query, models.Contrato, current_user, x_view_mode)
     
     if estat_actual:
@@ -98,9 +100,13 @@ def list_contratos(
     ).group_by(models.Contrato.codi_expedient).subquery()
     
     # Final results come from filtering the main query for these IDs
+    # Dynamic sorting
+    sort_attr = getattr(models.Contrato, sort, models.Contrato.data_publicacio)
+    sort_func = desc(sort_attr) if order == "desc" else sort_attr
+    
     results = db.query(models.Contrato).filter(models.Contrato.id.in_(
         db.query(representative_ids.c.min_id)
-    )).order_by(models.Contrato.data_publicacio.desc()).offset(skip).limit(limit).all()
+    )).order_by(nulls_last(sort_func)).offset(skip).limit(limit).all()
     
     if not results:
         return []
@@ -137,7 +143,7 @@ def get_dashboard_stats(
     current_user: models.Empleado = Depends(get_current_user),
     x_view_mode: str = Header(alias="X-View-Mode", default="user")
 ):
-    base_query = apply_department_filter(db.query(models.Contrato), models.Contrato, current_user, x_view_mode)
+    base_query = apply_department_filter(db.query(models.Contrato).filter(func.coalesce(models.Contrato.origen, 'local') == 'local'), models.Contrato, current_user, x_view_mode)
     base_menores_query = apply_department_filter(db.query(models.ContratoMenor), models.ContratoMenor, current_user, x_view_mode)
 
     if year is not None:
@@ -305,6 +311,24 @@ def get_dashboard_stats(
         for r in renovacions_query
     ]
 
+    # 3. Contractes possiblement finalitzats (pendents de revisió)
+    finalitzats_query = base_query.filter(
+        models.Contrato.possiblement_finalitzat == True
+    ).order_by(models.Contrato.data_finalitzacio_calculada.desc()).limit(20).all()
+
+    contractes_finalitzats_pendents = [
+        {
+            "id": c.id,
+            "codi_expedient": c.codi_expedient,
+            "objecte": c.objecte_contracte,
+            "adjudicatari": c.adjudicatari_nom,
+            "data_finalitzacio": c.data_finalitzacio_calculada.isoformat() if c.data_finalitzacio_calculada else (c.data_final.isoformat() if c.data_final else None),
+            "importe": float(c.import_adjudicacio_amb_iva or 0),
+            "estat_actual": c.estat_actual,
+        }
+        for c in finalitzats_query
+    ]
+
     # 3. Licitadors únics
     json_data_query = base_query.filter(models.Contrato.datos_json.isnot(None)).with_entities(models.Contrato.datos_json).limit(5000).all()
     licitadors_unics = 0
@@ -333,16 +357,18 @@ def get_dashboard_stats(
         contratos_por_departamento=contratos_por_departamento,
         temps_mitja_tramitacio_dies=temps_mitja_tramitacio_dies,
         licitadors_unics=licitadors_unics,
-        renovacions_critiques=renovacions_critiques
+        renovacions_critiques=renovacions_critiques,
+        contractes_finalitzats_pendents=contractes_finalitzats_pendents
     )
 
 
 @router.get("/filtros")
 def get_filtro_opciones(db: Session = Depends(get_db)):
     """Obtiene las opciones disponibles para los filtros"""
-    estados = db.query(models.Contrato.estat_actual).distinct().all()
-    tipos = db.query(models.Contrato.tipus_contracte).distinct().all()
-    procedimientos = db.query(models.Contrato.procediment).distinct().all()
+    local_filter = func.coalesce(models.Contrato.origen, 'local') == 'local'
+    estados = db.query(models.Contrato.estat_actual).filter(local_filter).distinct().all()
+    tipos = db.query(models.Contrato.tipus_contracte).filter(local_filter).distinct().all()
+    procedimientos = db.query(models.Contrato.procediment).filter(local_filter).distinct().all()
     
     return {
         "estados": [e[0] for e in estados if e[0]],
@@ -384,7 +410,7 @@ def export_contratos_csv(
     import csv
     import io
     
-    query = db.query(models.Contrato)
+    query = db.query(models.Contrato).filter(func.coalesce(models.Contrato.origen, 'local') == 'local')
     
     # Reutilitzem exactament la mateixa lògica de filtratge que el GET /
     from services.access_control import apply_department_filter
@@ -619,6 +645,14 @@ def update_contrato(
                 usuario_id=current_user.id
             )
             db.add(historial)
+            
+            # Si s'actualitza la data_final manualment, sincronitzem la calculada
+            # i la de fi d'execució perquè surti correctament al Pla de Contractació
+            # i a la resta d'apartats de seguiment.
+            if field == "data_final":
+                db_contrato.data_finalitzacio_calculada = value
+                db_contrato.data_fi_execucio = value
+                
         setattr(db_contrato, field, value)
     db.commit()
     
@@ -700,3 +734,80 @@ def get_contrato_modificacions(contrato_id: int, db: Session = Depends(get_db)):
     ).order_by(models.Modificacion.numero_modificacio).all()
     
     return modificacions
+
+
+@router.post("/{contrato_id}/finalitzar")
+def finalitzar_contrato(
+    contrato_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    """
+    Confirma que un contracte possiblement finalitzat està realment finalitzat.
+    Actualitza l'estat a 'Finalitzat' i registra el canvi a l'historial.
+    """
+    db_contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not db_contrato:
+        raise HTTPException(status_code=404, detail="Contracte no trobat")
+
+    # Permisos: admin, responsable_contratacion, o responsable del contracte
+    is_admin = current_user.rol in ["admin", "responsable_contratacion"]
+    is_responsable = db_contrato.responsables and current_user in db_contrato.responsables
+    if not is_admin and not is_responsable:
+        raise HTTPException(status_code=403, detail="No tens permisos per finalitzar aquest contracte")
+
+    old_estat = db_contrato.estat_actual
+
+    # Registrar a l'historial
+    historial = models.HistorialContrato(
+        contrato_id=contrato_id,
+        campo_modificado='estat_actual',
+        valor_anterior=old_estat or '',
+        valor_nuevo='Finalitzat',
+        tipo_cambio='manual',
+        usuario_id=current_user.id
+    )
+    db.add(historial)
+
+    db_contrato.estat_actual = 'Finalitzat'
+    db_contrato.possiblement_finalitzat = False  # Ara sí, el treiem de la llista de revisions
+    db.commit()
+
+    return {"message": f"Contracte {db_contrato.codi_expedient} marcat com a Finalitzat"}
+
+
+@router.post("/{contrato_id}/descartar-finalitzacio")
+def descartar_finalitzacio(
+    contrato_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    """
+    Descarta l'alerta de possiblement finalitzat.
+    El contracte desapareix de la llista d'avisos sense canviar-li l'estat.
+    """
+    db_contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not db_contrato:
+        raise HTTPException(status_code=404, detail="Contracte no trobat")
+
+    is_admin = current_user.rol in ["admin", "responsable_contratacion"]
+    is_responsable = db_contrato.responsables and current_user in db_contrato.responsables
+    if not is_admin and not is_responsable:
+        raise HTTPException(status_code=403, detail="No tens permisos per gestionar aquest contracte")
+
+    # Registrar a l'historial
+    historial = models.HistorialContrato(
+        contrato_id=contrato_id,
+        campo_modificado='possiblement_finalitzat',
+        valor_anterior='True',
+        valor_nuevo='False (descartat)',
+        tipo_cambio='manual',
+        usuario_id=current_user.id
+    )
+    db.add(historial)
+
+    db_contrato.possiblement_finalitzat = False
+    db_contrato.alerta_finalitzacio = False
+    db.commit()
+
+    return {"message": f"Alerta descartada per {db_contrato.codi_expedient}"}

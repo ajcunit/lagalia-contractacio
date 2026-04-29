@@ -72,6 +72,7 @@ def get_bajas_temerarias(
     check_auditoria_permission(current_user)
     
     query = db.query(models.Contrato).filter(
+        func.coalesce(models.Contrato.origen, 'local') == 'local',
         models.Contrato.preu_licitar > 0,
         models.Contrato.preu_adjudicar > 0,
         models.Contrato.preu_adjudicar <= models.Contrato.preu_licitar * 0.8,
@@ -110,9 +111,9 @@ def get_caducidad_proxima(
     check_auditoria_permission(current_user)
     
     now = datetime.now()
-    six_months = now + timedelta(days=180)
     
     query = db.query(models.Contrato).filter(
+        func.coalesce(models.Contrato.origen, 'local') == 'local',
         models.Contrato.alerta_finalitzacio == True
     )
     

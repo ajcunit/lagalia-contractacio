@@ -1,1 +1,1 @@
-# LicitIA v2 Core Module
+# LAGALia Contractació Core Module

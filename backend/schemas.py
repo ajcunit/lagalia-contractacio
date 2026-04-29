@@ -253,6 +253,7 @@ class ContratoListItem(BaseModel):
     objecte_contracte: Optional[str]
     adjudicatari_nom: Optional[str]
     import_adjudicacio_amb_iva: Optional[float]
+    data_publicacio: Optional[date]
     data_inici: Optional[date]
     estat_actual: Optional[str]
     estado_interno: str
@@ -460,10 +461,11 @@ class DashboardStats(BaseModel):
     ultima_sincronizacion: Optional[datetime]
     contratos_este_mes: int
     top_adjudicatarios: List[dict]
-    contratos_proximos_finalizar: int  # Contractes que acaben en 6 mesos
+    contratos_proximos_finalizar: int  # Contractes que acaben els propers mesos
     contratos_posiblemente_finalizados: int  # Contractes possiblement finalitzats
     total_contratos_menores: int = 0
     total_importe_menores: float = 0.0
+    contractes_finalitzats_pendents: List[dict] = []
 
 
 # Filtros de búsqueda
