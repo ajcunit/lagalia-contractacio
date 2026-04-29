@@ -60,12 +60,8 @@ class ExternalAPIClient:
             raise TypeError
 
         async with ai_api_limiter:
-            # Netegem la base_url per si ja porta /api
             base = base_url.rstrip('/')
-            if base.endswith('/api'):
-                base = base[:-4].rstrip('/')
-            
-            url = f"{base}/api/{endpoint.lstrip('/')}"
+            url = f"{base}/{endpoint.lstrip('/')}"
             logger.info(f"AI CALL -> {method} {url}")
             
             async with httpx.AsyncClient(timeout=120.0) as client:
@@ -76,7 +72,11 @@ class ExternalAPIClient:
                     response = await client.post(url, content=content, headers={"Content-Type": "application/json"})
                 
                 if response.status_code == 404:
-                    logger.error(f"Ollama 404 a {url}. Revisa la URL base.")
+                    try:
+                        err_detail = response.json()
+                        logger.error(f"Ollama 404 a {url}. Detall: {err_detail}")
+                    except:
+                        logger.error(f"Ollama 404 a {url}. L'endpoint o el model no existeix.")
                     
                 response.raise_for_status()
                 return response.json()
