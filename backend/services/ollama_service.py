@@ -50,9 +50,13 @@ class OllamaService:
             
         think_cfg = db.query(models.Configuracion).filter(models.Configuracion.clave == "ollama_think").first()
         
+        model_name = model_cfg.valor if model_cfg and model_cfg.valor else ""
+        if not model_name:
+            raise ValueError(f"No hi ha cap model configurat per al mòdul '{feature}'. Si us plau, selecciona un model a Configuració -> Serveis IA.")
+
         return {
             "url": url_cfg.valor if url_cfg else "http://localhost:11434",
-            "model": model_cfg.valor if model_cfg and model_cfg.valor else "llama3",
+            "model": model_name,
             "think": think_cfg.valor if think_cfg else "smart"
         }
 

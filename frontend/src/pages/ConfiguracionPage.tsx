@@ -434,10 +434,13 @@ export default function ConfiguracionPage() {
                                                 value={configs.ollama_model_cpv}
                                                 onChange={(e) => handleChange('ollama_model_cpv', e.target.value)}
                                             >
+                                                <option value="" disabled>-- Selecciona un model --</option>
                                                 {availableModels.map(m => (
                                                     <option key={`cpv-${m}`} value={m}>{m}</option>
                                                 ))}
-                                                <option value="llama3">llama3 (default)</option>
+                                                {availableModels.length === 0 && configs.ollama_model_cpv && (
+                                                    <option value={configs.ollama_model_cpv}>{configs.ollama_model_cpv}</option>
+                                                )}
                                             </select>
                                             <button type="button" onClick={() => fetchModels()} className="btn btn-xs btn-ghost">
                                                 <RefreshCw size={14} className={loadingModels ? 'animate-spin' : ''} />
@@ -451,10 +454,13 @@ export default function ConfiguracionPage() {
                                             value={configs.ollama_model_auditoria}
                                             onChange={(e) => handleChange('ollama_model_auditoria', e.target.value)}
                                         >
+                                            <option value="" disabled>-- Selecciona un model --</option>
                                             {availableModels.map(m => (
                                                 <option key={`audit-${m}`} value={m}>{m}</option>
                                             ))}
-                                            <option value="llama3">llama3 (default)</option>
+                                            {availableModels.length === 0 && configs.ollama_model_auditoria && (
+                                                <option value={configs.ollama_model_auditoria}>{configs.ollama_model_auditoria}</option>
+                                            )}
                                         </select>
                                     </div>
                                     <div className="space-y-1">
