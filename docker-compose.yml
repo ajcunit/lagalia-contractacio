@@ -41,6 +41,8 @@ services:
 
 volumes:
   pgdata:
+    external: true
+    name: licitia_pgdata
 
 networks:
   lagalia:
