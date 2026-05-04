@@ -12,7 +12,13 @@ import {
     Bot,
     Sparkles,
     MessageSquare,
-    Terminal
+    Terminal,
+    Layout,
+    FileCheck,
+    Search,
+    Bell,
+    Zap,
+    Boxes
 } from 'lucide-react';
 
 import Sincronizacion from './Sincronizacion';
@@ -20,7 +26,7 @@ import Empleados from './Empleados';
 import Departamentos from './Departamentos';
 
 export default function ConfiguracionPage() {
-    const [activeTab, setActiveTab] = useState<'general' | 'sync' | 'personnel' | 'ai'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'sync' | 'personnel' | 'ai' | 'integrations' | 'modules'>('general');
     const [personnelTab, setPersonnelTab] = useState<'employees' | 'departments'>('employees');
     
     const [configs, setConfigs] = useState<Record<string, string>>({
@@ -39,7 +45,16 @@ export default function ConfiguracionPage() {
         'prompt_cpv_extract': '',
         'prompt_cpv_rank': '',
         'prompt_auditoria': '',
-        'dashboard_mesos_caducitat': '3'
+        'dashboard_mesos_caducitat': '3',
+        'gestiona_integration_enabled': 'false',
+        'gestiona_webhook_url': '',
+        'gestiona_pool_url': '',
+        'module_pla_enabled': 'true',
+        'module_generador_ia_enabled': 'true',
+        'module_auditoria_ia_enabled': 'true',
+        'module_revisions_enabled': 'true',
+        'module_superbuscador_enabled': 'true',
+        'module_cpv_enabled': 'true'
     });
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
@@ -63,7 +78,10 @@ export default function ConfiguracionPage() {
                 'ine10_code', 'sync_api_url', 'prorrogues_api_url', 'cpv_api_url', 
                 'ollama_url', 'ollama_model_cpv', 'ollama_model_auditoria', 'ollama_think', 
                 'ia_enabled', 'ai_provider', 'gemini_api_key', 'gemini_model',
-                'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria', 'dashboard_mesos_caducitat'
+                'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria', 'dashboard_mesos_caducitat',
+                'gestiona_integration_enabled', 'gestiona_webhook_url', 'gestiona_pool_url',
+                'module_pla_enabled', 'module_generador_ia_enabled', 'module_auditoria_ia_enabled',
+                'module_revisions_enabled', 'module_superbuscador_enabled', 'module_cpv_enabled'
             ];
             const newConfigs: Record<string, string> = {};
             
@@ -78,6 +96,8 @@ export default function ConfiguracionPage() {
                     else if (key === 'gemini_model') newConfigs[key] = 'gemini-1.5-flash';
                     else if (key === 'ia_enabled') newConfigs[key] = 'false';
                     else if (key === 'dashboard_mesos_caducitat') newConfigs[key] = '3';
+                    else if (key === 'gestiona_integration_enabled') newConfigs[key] = 'false';
+                    else if (key.startsWith('module_')) newConfigs[key] = 'true';
                     else newConfigs[key] = '';
                 }
             }
@@ -160,6 +180,19 @@ export default function ConfiguracionPage() {
                         Sincronització
                     </button>
                 )}
+                {isAdmin && (
+                    <button
+                        onClick={() => setActiveTab('modules')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                            activeTab === 'modules' 
+                            ? 'bg-white text-primary-600 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Boxes size={16} />
+                        Mòduls
+                    </button>
+                )}
                 {(isAdmin || isResponsable) && (
                     <button
                         onClick={() => setActiveTab('personnel')}
@@ -184,6 +217,19 @@ export default function ConfiguracionPage() {
                     >
                         <Brain size={16} />
                         Serveis IA
+                    </button>
+                )}
+                {isAdmin && (
+                    <button
+                        onClick={() => setActiveTab('integrations')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                            activeTab === 'integrations' 
+                            ? 'bg-white text-primary-600 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Globe size={16} />
+                        Integracions
                     </button>
                 )}
             </div>
@@ -586,6 +632,261 @@ export default function ConfiguracionPage() {
                             >
                                 {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
                                 Guardar Configuració d'IA
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'modules' && isAdmin && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="glass-card p-6">
+                            <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4">
+                                <Boxes size={20} className="text-primary-500" />
+                                <h2>Gestió de Mòduls del Sistema</h2>
+                            </div>
+                            
+                            <p className="text-sm text-slate-500 mb-8">
+                                Activa o desactiva les funcionalitats principals de l'aplicació. Els mòduls desactivats s'amagaran de la barra lateral i dels menús per a tots els usuaris.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Pla de Contractació */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+                                            <Layout size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Pla de Contractació</h3>
+                                            <p className="text-xs text-slate-400">Planificació anual de licitacions</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_pla_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_pla_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_pla_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_pla_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Generador IA */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                                            <Zap size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Generador de Documentació IA</h3>
+                                            <p className="text-xs text-slate-400">Creació de PPTs i informes amb IA</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_generador_ia_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_generador_ia_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_generador_ia_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_generador_ia_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Auditoria IA */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                                            <FileCheck size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Auditoria IA</h3>
+                                            <p className="text-xs text-slate-400">Anàlisi automàtic de riscos i errors</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_auditoria_ia_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_auditoria_ia_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_auditoria_ia_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_auditoria_ia_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Revisions */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+                                            <Bell size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Revisions i Venciments</h3>
+                                            <p className="text-xs text-slate-400">Gestió de finalitzacions de contractes</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_revisions_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_revisions_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_revisions_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_revisions_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* SuperBuscador */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                            <Search size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">SuperBuscador</h3>
+                                            <p className="text-xs text-slate-400">Cerca de contractes en altres ens</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_superbuscador_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_superbuscador_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_superbuscador_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_superbuscador_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* Buscador CPV */}
+                                <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                                            <Search size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-medium text-slate-800">Buscador CPV</h3>
+                                            <p className="text-xs text-slate-400">Cerca de codis CPV i classificacions</p>
+                                        </div>
+                                    </div>
+                                    <label className="flex items-center cursor-pointer">
+                                        <div className="relative">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only" 
+                                                checked={configs.module_cpv_enabled === 'true'}
+                                                onChange={(e) => handleChange('module_cpv_enabled', e.target.checked ? 'true' : 'false')}
+                                            />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${configs.module_cpv_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.module_cpv_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Save Button Modules */}
+                        <div className="flex flex-col items-end gap-3 mt-6">
+                            {message && (
+                                <div className={`text-sm px-4 py-2 rounded-lg ${
+                                    message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+                            <button 
+                                onClick={handleSave} 
+                                className="btn btn-primary px-12 gap-2 shadow-lg hover:shadow-primary-200 transition-all font-bold" 
+                                disabled={saving}
+                            >
+                                {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                                Guardar Configuració de Mòduls
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'integrations' && isAdmin && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="glass-card p-6">
+                            <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Globe size={20} className="text-primary-500" />
+                                    <h2>Integració Gestiona</h2>
+                                </div>
+                                <label className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only" 
+                                            checked={configs.gestiona_integration_enabled === 'true'}
+                                            onChange={(e) => handleChange('gestiona_integration_enabled', e.target.checked ? 'true' : 'false')}
+                                        />
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${configs.gestiona_integration_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.gestiona_integration_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                    <span className="ml-3 text-sm font-medium text-slate-700">Activar Integració</span>
+                                </label>
+                            </div>
+                            
+                            <div className={`space-y-4 ${configs.gestiona_integration_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Webhook n8n URL</label>
+                                    <input 
+                                        type="url" 
+                                        className="input input-bordered w-full" 
+                                        value={configs.gestiona_webhook_url}
+                                        onChange={(e) => handleChange('gestiona_webhook_url', e.target.value)}
+                                        placeholder="https://n8n.elteudomini.com/webhook/..."
+                                    />
+                                    <p className="text-xs text-slate-400">URL del flux de n8n que rebrà les dades i crearà l'expedient a Gestiona.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Gestiona Pool URL</label>
+                                    <input 
+                                        type="url" 
+                                        className="input input-bordered w-full" 
+                                        value={configs.gestiona_pool_url}
+                                        onChange={(e) => handleChange('gestiona_pool_url', e.target.value)}
+                                        placeholder="https://vostrepoblacio.gestiona.es"
+                                    />
+                                    <p className="text-xs text-slate-400">URL base de la vostra instància de Gestiona (ex: https://ajuntament.gestiona.es).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-3 mt-6">
+                            {message && (
+                                <div className={`text-sm px-4 py-2 rounded-lg ${
+                                    message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+                            <button 
+                                onClick={handleSave} 
+                                className="btn btn-primary px-12 gap-2 shadow-lg hover:shadow-primary-200 transition-all font-bold" 
+                                disabled={saving}
+                            >
+                                {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                                Guardar Configuració
                             </button>
                         </div>
                     </div>

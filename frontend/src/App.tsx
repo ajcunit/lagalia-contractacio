@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Contratos from './pages/Contratos';
 import Contratacion from './pages/Contratacion';
 import ContratoDetalle from './pages/ContratoDetalle';
+import ContratoCrear from './pages/ContratoCrear';
 import Duplicados from './pages/Duplicados';
 import Sincronizacion from './pages/Sincronizacion';
 import Departamentos from './pages/Departamentos';
@@ -46,6 +47,7 @@ function App() {
                             <Route path="dashboard" element={<Dashboard />} />
                             <Route path="contratacion" element={<Contratacion />} />
                             <Route path="contratos" element={<Contratos />} />
+                            <Route path="contratos/nou" element={<ContratoCrear />} />
                             <Route path="contratos/:id" element={<ContratoDetalle />} />
                             <Route path="duplicados" element={<Duplicados />} />
                             <Route path="sincronizacion" element={<Sincronizacion />} />

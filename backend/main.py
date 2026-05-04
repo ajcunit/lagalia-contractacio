@@ -69,6 +69,9 @@ def run_migrations():
             empleado_id INTEGER NOT NULL REFERENCES empleados(id) ON DELETE CASCADE,
             PRIMARY KEY (contrato_id, empleado_id)
         )""",
+        "ALTER TABLE contratos ADD COLUMN IF NOT EXISTS id_expedient_gestiona VARCHAR(255)",
+        "ALTER TABLE historial_contratos DROP CONSTRAINT IF EXISTS check_tipo_cambio",
+        "ALTER TABLE historial_contratos ADD CONSTRAINT check_tipo_cambio CHECK (tipo_cambio IN ('sincronizacion', 'manual', 'validacion', 'webhook_gestiona'))",
         # v2.2 — Separar contractes externs (superbuscador) dels locals (ajuntament)
         "ALTER TABLE contratos ADD COLUMN IF NOT EXISTS origen VARCHAR(20) DEFAULT 'local'",
         "UPDATE contratos SET origen = 'local' WHERE origen IS NULL",

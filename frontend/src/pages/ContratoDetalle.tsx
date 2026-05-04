@@ -22,6 +22,7 @@ import {
     Plus,
 } from 'lucide-react';
 import { usePPTCart } from '../context/PPTContext';
+import { showAlert } from '../utils/swal';
 
 
 export default function ContratoDetalle() {
@@ -40,6 +41,8 @@ export default function ContratoDetalle() {
     const [empleados, setEmpleados] = useState<Empleado[]>([]);
     const [enriching, setEnriching] = useState(false);
     const [activeFaseTab, setActiveFaseTab] = useState<string>('licitacio');
+    const [gestionaEnabled, setGestionaEnabled] = useState(false);
+    const [gestionaPoolUrl, setGestionaPoolUrl] = useState("");
     
     const [cpvDescriptions, setCpvDescriptions] = useState<Record<string, string>>({});
     const [lots, setLots] = useState<Contrato[]>([]);
@@ -68,6 +71,12 @@ export default function ContratoDetalle() {
         };
         loadAllData();
         api.getMe().then(setUser).catch(() => {});
+        api.getConfig('gestiona_integration_enabled')
+            .then(res => setGestionaEnabled(res.valor === 'true'))
+            .catch(() => setGestionaEnabled(false));
+        api.getConfig('gestiona_pool_url')
+            .then(res => setGestionaPoolUrl(res.valor || ""))
+            .catch(() => setGestionaPoolUrl(""));
     }, [id]);
 
     const loadContrato = async (contratoId: number) => {
@@ -221,7 +230,7 @@ export default function ContratoDetalle() {
         } catch (err: any) {
             console.error('Error saving contract:', err);
             const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-            alert("Error al desar: " + errorMsg);
+            showAlert("Error al desar: " + errorMsg, 'error');
         } finally {
             setSaving(false);
         }
@@ -433,6 +442,37 @@ export default function ContratoDetalle() {
                 {(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable') && (
                     /* Header Actions */
                     <div className="flex items-center gap-3">
+                        {gestionaEnabled && (
+                            <>
+                                {contrato.id_expedient_gestiona ? (
+                                    <a 
+                                        href={`${gestionaPoolUrl}${gestionaPoolUrl.endsWith('/') ? '' : '/'}dossier/${contrato.id_expedient_gestiona}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn bg-blue-600 hover:bg-blue-700 text-white border-transparent gap-2"
+                                    >
+                                        <ExternalLink size={18} />
+                                        Anar a Gestiona
+                                    </a>
+                                ) : (
+                                    <button 
+                                        onClick={async () => {
+                                            try {
+                                                const response = await api.triggerGestionaWebhook(contrato.id);
+                                                showAlert(response.message || "L'expedient s'ha enviat a Gestiona correctament.", 'success');
+                                                await loadContrato(contrato.id); // Reload in case codi_expedient was updated
+                                            } catch (err: any) {
+                                                showAlert(err.message || 'No s\'ha pogut enviar a Gestiona', 'error');
+                                            }
+                                        }} 
+                                        className="btn bg-emerald-600 hover:bg-emerald-700 text-white border-transparent gap-2"
+                                    >
+                                        <ExternalLink size={18} />
+                                        Obrir a Gestiona
+                                    </button>
+                                )}
+                            </>
+                        )}
                         {!contrato.fecha_enriquiment && (user?.rol === 'admin' || user?.rol === 'responsable_contratacion') && (
                             <button onClick={handleEnrich} disabled={enriching} className="btn btn-secondary gap-2" title="Descarrega dades detallades de les fases">
                                 {enriching ? <div className="loading-spinner w-4 h-4"></div> : <Download size={18} />}

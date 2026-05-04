@@ -13,6 +13,7 @@ import {
     Minus,
 } from 'lucide-react';
 import { useSortableData, SortableTh } from '../components/SortableTable';
+import { showAlert, showConfirm } from '../utils/swal';
 
 export default function Sincronizacion() {
     const [sincronizacionesRaw, setSincronizacionesRaw] = useState<SincronizacionType[]>([]);
@@ -42,8 +43,15 @@ export default function Sincronizacion() {
 
     const canSync = user?.rol === 'admin' || user?.rol === 'responsable_contratacion';
 
-    const handleEnrichBatch = () => {
-        if (!confirm('Això enriquirà tots els contractes històrics de la base de dades. El procés pot trigar una bona estona. Vols continuar?')) return;
+    const handleEnrichBatch = async () => {
+        const result = await showConfirm(
+            'Enriquiment Històric',
+            'Això enriquirà tots els contractes històrics de la base de dades. El procés pot trigar una bona estona. Vols continuar?',
+            'Sí, enriquir tot',
+            'Cancel·lar'
+        );
+        
+        if (!result.isConfirmed) return;
         
         setEnriching(true);
         setEnrichProgress(0);
@@ -62,6 +70,7 @@ export default function Sincronizacion() {
             () => {
                 setEnriching(false);
                 setEnrichMessage('Enriquiment completat amb èxit.');
+                showAlert('Enriquiment completat amb èxit.', 'success');
             }
         );
     };
@@ -87,7 +96,7 @@ export default function Sincronizacion() {
 
     const handleSyncMenors = () => {
         if (!codiIne10) {
-            alert('Error: Codi INE10 no configurat');
+            showAlert('Error: Codi INE10 no configurat', 'error');
             return;
         }
         setSyncingMenors(true);
@@ -107,7 +116,7 @@ export default function Sincronizacion() {
             },
             (stats) => {
                 setSyncingMenors(false);
-                alert(`Sincronització de contractes menors completada amb èxit.\nNous: ${stats.nous}\nActualitzats: ${stats.actualitzats}`);
+                showAlert(`Sincronització de contractes menors completada amb èxit.\nNous: ${stats.nous}\nActualitzats: ${stats.actualitzats}`, 'success');
             }
         );
     };
@@ -129,7 +138,7 @@ export default function Sincronizacion() {
             },
             (stats) => {
                 setSyncingCpvs(false);
-                alert(`Sincronització de CPVs completada amb èxit.\nNous: ${stats.nuevos}\nActualitzats: ${stats.actualizados}`);
+                showAlert(`Sincronització de CPVs completada amb èxit.\nNous: ${stats.nuevos}\nActualitzats: ${stats.actualizados}`, 'success');
             }
         );
     };
@@ -179,10 +188,10 @@ export default function Sincronizacion() {
             await api.updateConfig('sync_cron_timezone', autoSyncTimezone);
             await api.updateConfig('sync_cron_days', daysToSave);
             await api.reloadScheduler();
-            alert('Configuració de sincronització automàtica guardada correctament.');
+            showAlert('Configuració de sincronització automàtica guardada correctament.', 'success');
         } catch (err) {
             console.error('Error saving auto sync config:', err);
-            alert('Hi ha hagut un error en guardar la configuració. Revisa els logs.');
+            showAlert('Hi ha hagut un error en guardar la configuració. Revisa els logs.', 'error');
         } finally {
             setSavingAutoSync(false);
         }

@@ -73,6 +73,7 @@ class Contrato(Base):
     
     # Identificadores
     codi_expedient = Column(String(255), nullable=False, index=True)
+    id_expedient_gestiona = Column(String(255))
     codi_ine10 = Column(String(50))
     codi_dir3 = Column(String(50))
     
@@ -302,7 +303,7 @@ class HistorialContrato(Base):
     tipo_cambio = Column(String(50))
 
     __table_args__ = (
-        CheckConstraint(tipo_cambio.in_(['sincronizacion', 'manual', 'validacion']), name='check_tipo_cambio'),
+        CheckConstraint(tipo_cambio.in_(['sincronizacion', 'manual', 'validacion', 'webhook_gestiona']), name='check_tipo_cambio'),
     )
 
     contrato = relationship("Contrato", back_populates="historial")

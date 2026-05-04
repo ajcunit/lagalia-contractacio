@@ -10,6 +10,7 @@ import {
     RefreshCw,
     FileText,
 } from 'lucide-react';
+import { showAlert, showConfirm } from '../utils/swal';
 
 type Tab = 'finalitzats' | 'proxims';
 
@@ -41,26 +42,42 @@ export default function Revisions() {
     }, []);
 
     const handleFinalitzar = async (id: number, expedient: string) => {
-        if (!window.confirm(`Confirmes que el contracte ${expedient} està realment finalitzat?`)) return;
+        const result = await showConfirm(
+            'Confirmar Finalització',
+            `Confirmes que el contracte ${expedient} està realment finalitzat?`,
+            'Sí, finalitzar',
+            'Cancel·lar'
+        );
+        if (!result.isConfirmed) return;
+        
         try {
             setActionLoading(id);
             await api.finalitzarContrato(id);
             await loadData();
+            showAlert('Contracte finalitzat correctament', 'success');
         } catch (err: any) {
-            alert(err.message || 'Error al finalitzar el contracte');
+            showAlert(err.message || 'Error al finalitzar el contracte', 'error');
         } finally {
             setActionLoading(null);
         }
     };
 
     const handleDescartar = async (id: number, expedient: string) => {
-        if (!window.confirm(`Descartar l'alerta de finalització per ${expedient}? El contracte tornarà a l'estat normal.`)) return;
+        const result = await showConfirm(
+            'Descartar Alerta',
+            `Descartar l'alerta de finalització per ${expedient}? El contracte tornarà a l'estat normal.`,
+            'Sí, descartar',
+            'Cancel·lar'
+        );
+        if (!result.isConfirmed) return;
+
         try {
             setActionLoading(id);
             await api.descartarFinalitzacio(id);
             await loadData();
+            showAlert("Alerta descartada correctament", 'success');
         } catch (err: any) {
-            alert(err.message || "Error al descartar l'alerta");
+            showAlert(err.message || "Error al descartar l'alerta", 'error');
         } finally {
             setActionLoading(null);
         }

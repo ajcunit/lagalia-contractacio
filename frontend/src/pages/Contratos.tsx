@@ -15,6 +15,7 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
     const [user, setUser] = useState<Empleado | null>(null);
     const [selectedContracts, setSelectedContracts] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [gestionaEnabled, setGestionaEnabled] = useState(false);
     
     const [urlParams, setUrlParams] = useSearchParams();
 
@@ -55,6 +56,9 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
     useEffect(() => {
         loadDepartamentos();
         api.getMe().then(setUser).catch(console.error);
+        api.getConfig('gestiona_integration_enabled')
+            .then(res => setGestionaEnabled(res.valor === 'true'))
+            .catch(() => setGestionaEnabled(false));
     }, []);
 
     // Main data fetching effect: depends only on URL
@@ -260,6 +264,16 @@ export default function Contratos({ hideHeader = false }: ContratosProps) {
                     </button>
 
                     <div className="h-8 w-px bg-slate-200 mx-1"></div>
+
+                    {gestionaEnabled && canAssign && (
+                        <button 
+                            onClick={() => navigate('/contratos/nou')} 
+                            className="h-11 px-5 flex items-center gap-2 rounded-xl bg-primary-600 text-white font-bold text-sm shadow-sm hover:bg-primary-700 transition-all active:scale-95"
+                            title="Obrir Expedient a Gestiona"
+                        >
+                            Obrir Expedient
+                        </button>
+                    )}
 
                     <button onClick={handleExportCSV} className="h-11 w-11 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:bg-slate-50 hover:text-primary-600 border border-slate-100 hover:border-primary-100 shadow-sm transition-all active:scale-95" title="Exportar CSV">
                         <ExternalLink size={20} />

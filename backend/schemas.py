@@ -73,6 +73,7 @@ class EmpleadoConDepartamento(Empleado):
 # Contrato Schemas
 class ContratoBase(BaseModel):
     codi_expedient: str
+    id_expedient_gestiona: Optional[str] = None
     codi_ine10: Optional[str] = None
     codi_dir3: Optional[str] = None
     objecte_contracte: Optional[str] = None

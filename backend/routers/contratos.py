@@ -524,6 +524,133 @@ def enrich_batch_stream(
     )
 
 
+@router.post("/", response_model=schemas.Contrato)
+def create_contrato(
+    contrato_in: schemas.ContratoCreate,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    if current_user.rol not in ["admin", "responsable_contratacion", "responsable"]:
+        raise HTTPException(status_code=403, detail="No tens permissos per crear contractes")
+        
+    # Check if codi_expedient already exists
+    existing = db.query(models.Contrato).filter(models.Contrato.codi_expedient == contrato_in.codi_expedient).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ja existeix un contracte amb aquest codi d'expedient")
+        
+    db_contrato = models.Contrato(**contrato_in.model_dump(exclude={'departamentos_ids', 'responsables_ids'}))
+    db_contrato.origen = 'local'
+    
+    if contrato_in.departamentos_ids:
+        depts = db.query(models.Departamento).filter(models.Departamento.id.in_(contrato_in.departamentos_ids)).all()
+        db_contrato.departamentos = depts
+        
+    if contrato_in.responsables_ids:
+        resps = db.query(models.Empleado).filter(models.Empleado.id.in_(contrato_in.responsables_ids)).all()
+        db_contrato.responsables = resps
+        
+    db.add(db_contrato)
+    db.commit()
+    db.refresh(db_contrato)
+    
+    # Log
+    historial = models.HistorialContrato(
+        contrato_id=db_contrato.id,
+        campo_modificado='creacio_manual',
+        valor_anterior='',
+        valor_nuevo='Creat manualment',
+        tipo_cambio='manual',
+        usuario_id=current_user.id
+    )
+    db.add(historial)
+    db.commit()
+    
+    return db_contrato
+
+
+@router.post("/{contrato_id}/gestiona")
+def trigger_gestiona_webhook(
+    contrato_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.Empleado = Depends(get_current_user)
+):
+    import httpx
+    from models import Configuracion
+    
+    if current_user.rol not in ["admin", "responsable_contratacion", "responsable"]:
+        raise HTTPException(status_code=403, detail="No tens permissos")
+        
+    contrato = db.query(models.Contrato).filter(models.Contrato.id == contrato_id).first()
+    if not contrato:
+        raise HTTPException(status_code=404, detail="Contracte no trobat")
+        
+    webhook_cfg = db.query(Configuracion).filter(Configuracion.clave == "gestiona_webhook_url").first()
+    if not webhook_cfg or not webhook_cfg.valor:
+        raise HTTPException(status_code=400, detail="URL del webhook de Gestiona no configurada")
+        
+    webhook_url = webhook_cfg.valor
+    
+    # Payload basic
+    payload = {
+        "codi_expedient": contrato.codi_expedient,
+        "objecte_contracte": contrato.objecte_contracte,
+        "tipus_contracte": contrato.tipus_contracte,
+        "estat_actual": contrato.estat_actual,
+        "adjudicatari_nom": contrato.adjudicatari_nom,
+        "adjudicatari_nif": contrato.adjudicatari_nif,
+        "preu_licitar": float(contrato.preu_licitar) if contrato.preu_licitar else None,
+        "import_adjudicacio_amb_iva": float(contrato.import_adjudicacio_amb_iva) if contrato.import_adjudicacio_amb_iva else None,
+        "departaments": [d.nombre for d in contrato.departamentos],
+        "responsables": [r.nombre for r in contrato.responsables],
+        "usuario_email": current_user.email
+    }
+    
+    try:
+        with httpx.Client(timeout=15.0, verify=False) as client:
+            response = client.post(webhook_url, json=payload)
+            response.raise_for_status()
+            
+            # Extract and update data
+            try:
+                data = response.json()
+                item = data[0] if isinstance(data, list) and len(data) > 0 else data
+                
+                if isinstance(item, dict):
+                    nuevo_codi = item.get("codi_expedient") or item.get("codi_expediente") or item.get("expediente")
+                    id_gestiona = item.get("id_expedient_gestiona") or item.get("id_gestiona")
+                    
+                    if nuevo_codi or id_gestiona:
+                        if nuevo_codi:
+                            nuevo_codi_str = str(nuevo_codi).strip()
+                            if nuevo_codi_str != contrato.codi_expedient:
+                                historial = models.HistorialContrato(
+                                    contrato_id=contrato.id,
+                                    campo_modificado='codi_expedient',
+                                    valor_anterior=contrato.codi_expedient,
+                                    valor_nuevo=nuevo_codi_str,
+                                    tipo_cambio='webhook_gestiona',
+                                    usuario_id=current_user.id
+                                )
+                                contrato.codi_expedient = nuevo_codi_str
+                                db.add(historial)
+                        
+                        if id_gestiona:
+                            contrato.id_expedient_gestiona = str(id_gestiona).strip()
+                        
+                        db.add(contrato)
+                        db.commit()
+                        db.refresh(contrato)
+            except Exception as e:
+                print(f"ERROR: No s'ha pogut actualitzar la DB amb la resposta de n8n: {e}")
+                # No fem raise aquí perquè el webhook ja s'ha enviat amb èxit a n8n
+                return {"message": f"Enviat a Gestiona, però no s'ha pogut actualitzar el codi local: {str(e)}"}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al contactar amb Gestiona (n8n): {str(e)}")
+        
+    return {"message": "Expedient enviat a Gestiona correctament i codi actualitzat."}
+
+
 @router.get("/{contrato_id}", response_model=schemas.ContratoDetallat)
 def get_contrato(contrato_id: int, db: Session = Depends(get_db)):
     contrato = db.query(models.Contrato).options(
@@ -534,7 +661,7 @@ def get_contrato(contrato_id: int, db: Session = Depends(get_db)):
         joinedload(models.Contrato.modificacions),
     ).filter(models.Contrato.id == contrato_id).first()
     if not contrato:
-        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+        raise HTTPException(status_code=404, detail="Contracte no trobat")
     return contrato
 
 

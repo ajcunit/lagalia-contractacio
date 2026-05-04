@@ -47,6 +47,28 @@ def get_config(clave: str, db: Session = Depends(get_db)):
             return {"id": 0, "clave": "ldap_enabled", "valor": "false", "descripcion": "Activa l'autenticació LDAP", "updated_at": None}
         if clave == "dashboard_mesos_caducitat":
             return {"id": 0, "clave": "dashboard_mesos_caducitat", "valor": "3", "descripcion": "Mesos d'avís per venciment de contracte per defecte", "updated_at": None}
+        if clave == "gestiona_integration_enabled":
+            return {"id": 0, "clave": "gestiona_integration_enabled", "valor": "false", "descripcion": "Activa la integració amb Gestiona", "updated_at": None}
+        if clave == "gestiona_webhook_url":
+            return {"id": 0, "clave": "gestiona_webhook_url", "valor": "", "descripcion": "URL del Webhook n8n per Gestiona", "updated_at": None}
+        if clave == "gestiona_pool_url":
+            return {"id": 0, "clave": "gestiona_pool_url", "valor": "", "descripcion": "URL base de Gestiona (Pool)", "updated_at": None}
+        
+        # Mòduls
+        if clave == "module_pla_enabled":
+            return {"id": 0, "clave": "module_pla_enabled", "valor": "true", "descripcion": "Activa el mòdul de Pla de Contractació", "updated_at": None}
+        if clave == "module_generador_ia_enabled":
+            return {"id": 0, "clave": "module_generador_ia_enabled", "valor": "true", "descripcion": "Activa el mòdul de Generador de Documentació IA", "updated_at": None}
+        if clave == "module_auditoria_ia_enabled":
+            return {"id": 0, "clave": "module_auditoria_ia_enabled", "valor": "true", "descripcion": "Activa el mòdul d'Auditoria IA", "updated_at": None}
+        if clave == "module_sincronizacion_enabled":
+            return {"id": 0, "clave": "module_sincronizacion_enabled", "valor": "true", "descripcion": "Activa el mòdul de Sincronització", "updated_at": None}
+        if clave == "module_revisions_enabled":
+            return {"id": 0, "clave": "module_revisions_enabled", "valor": "true", "descripcion": "Activa el mòdul de Revisions i Venciments", "updated_at": None}
+        if clave == "module_superbuscador_enabled":
+            return {"id": 0, "clave": "module_superbuscador_enabled", "valor": "true", "descripcion": "Activa el mòdul de SuperBuscador Extern", "updated_at": None}
+        if clave == "module_cpv_enabled":
+            return {"id": 0, "clave": "module_cpv_enabled", "valor": "true", "descripcion": "Activa el mòdul de Buscador CPV", "updated_at": None}
         
         raise HTTPException(status_code=404, detail="Configuració no trobada")
     return cfg

@@ -44,6 +44,7 @@ export interface ContratoListItem {
 export interface Contrato {
     id: number;
     codi_expedient: string;
+    id_expedient_gestiona?: string;
     codi_ine10?: string;
     codi_dir3?: string;
     objecte_contracte?: string;
@@ -658,6 +659,19 @@ class ApiClient {
 
     async getContrato(id: number): Promise<Contrato> {
         return this.request<Contrato>(`/contratos/${id}`);
+    }
+
+    async createContrato(data: Partial<Contrato>): Promise<Contrato> {
+        return this.request<Contrato>('/contratos/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async triggerGestionaWebhook(id: number): Promise<{ message: string }> {
+        return this.request<{ message: string }>(`/contratos/${id}/gestiona`, {
+            method: 'POST',
+        });
     }
 
     async getContratoLots(id: number): Promise<Contrato[]> {

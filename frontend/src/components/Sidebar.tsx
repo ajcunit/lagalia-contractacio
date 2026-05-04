@@ -36,6 +36,15 @@ export default function Sidebar() {
         return localStorage.getItem('viewMode') || 'user';
     });
     const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [moduleConfigs, setModuleConfigs] = useState<Record<string, boolean>>({
+        'module_pla_enabled': true,
+        'module_generador_ia_enabled': true,
+        'module_auditoria_ia_enabled': true,
+        'module_sincronizacion_enabled': true,
+        'module_revisions_enabled': true,
+        'module_superbuscador_enabled': true,
+        'module_cpv_enabled': true
+    });
 
     useEffect(() => {
         if (isDark) {
@@ -65,26 +74,47 @@ export default function Sidebar() {
 
     useEffect(() => {
         api.getDuplicadosCount().then((data) => setPendientes(data.pendientes)).catch(() => { });
+        
+        // Carregar configuració de mòduls
+        const keys = [
+            'module_pla_enabled', 'module_generador_ia_enabled', 'module_auditoria_ia_enabled',
+            'module_sincronizacion_enabled', 'module_revisions_enabled', 'module_superbuscador_enabled', 'module_cpv_enabled'
+        ];
+        
+        const loadModuleConfigs = async () => {
+            const newConfigs: Record<string, boolean> = { ...moduleConfigs };
+            for (const key of keys) {
+                try {
+                    const cfg = await api.getConfig(key);
+                    newConfigs[key] = cfg.valor === 'true';
+                } catch (e) {
+                    // Default ja establert en el state
+                }
+            }
+            setModuleConfigs(newConfigs);
+        };
+        
+        loadModuleConfigs();
     }, []);
 
     const navItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
         { path: '/contratacion', icon: FileText, label: 'Contractació' },
-        ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable'
+        ...(moduleConfigs.module_revisions_enabled && (user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.rol === 'responsable')
             ? [{ path: '/revisions', icon: ClipboardCheck, label: 'Revisions' }]
             : []),
         ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' 
             ? (pendientes > 0 ? [{ path: '/duplicados', icon: AlertTriangle, label: 'Duplicats', badge: pendientes }] : []) 
             : []),
         { path: '/adjudicatarios', icon: Building2, label: 'Adjudicataris' },
-        { path: '/cpv', icon: Search, label: 'Buscador CPV' },
-        { path: '/superbuscador', icon: Globe, label: 'SuperBuscador' },
-        { path: '/generador-ppt', icon: Layers, label: 'Generador PPT' },
+        ...(moduleConfigs.module_cpv_enabled ? [{ path: '/cpv', icon: Search, label: 'Buscador CPV' }] : []),
+        ...(moduleConfigs.module_superbuscador_enabled ? [{ path: '/superbuscador', icon: Globe, label: 'SuperBuscador' }] : []),
+        ...(moduleConfigs.module_generador_ia_enabled ? [{ path: '/generador-ppt', icon: Layers, label: 'Generador PPT' }] : []),
         { path: '/favoritos', icon: Star, label: 'Favorits' },
-        ...(user?.permiso_auditoria || user?.rol === 'admin' 
+        ...(moduleConfigs.module_auditoria_ia_enabled && (user?.permiso_auditoria || user?.rol === 'admin') 
             ? [{ path: '/auditoria', icon: Flag, label: 'Auditoria/Alertes' }] 
             : []),
-        ...(user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.permiso_pla_contractacio
+        ...(moduleConfigs.module_pla_enabled && (user?.rol === 'admin' || user?.rol === 'responsable_contratacion' || user?.permiso_pla_contractacio)
             ? [{ path: '/pla-contractacio', icon: ClipboardList, label: 'Pla Contractació' }]
             : []),
     ];
