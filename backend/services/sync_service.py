@@ -305,11 +305,20 @@ class SyncService:
             config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
             mesos_alerta = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
             
-            data = SyncService.fetch_data(db, codi_ine10)
+            raw_data = SyncService.fetch_data(db, codi_ine10)
             
+            # Deduplicació: agafar el registre més recent per combinació de clau
+            dedup_map = {}
+            for r in raw_data:
+                key = (r.get("codi_expedient"), r.get("resultat") or r.get("fase_publicacio"), r.get("numero_lot"))
+                actualitzacio = SyncService.parse_date(r.get("data_actualitzacio")) or datetime.min
+                if key not in dedup_map or actualitzacio > dedup_map[key]["actualitzacio"]:
+                    dedup_map[key] = {"record": r, "actualitzacio": actualitzacio}
+            
+            data = [v["record"] for v in dedup_map.values()]
             total_records = len(data)
             sync.total_registros_api = total_records
-            yield f'data: {json.dumps({"msg": f"Processant {total_records} contractes...", "progress": 20})}\n\n'
+            yield f'data: {json.dumps({"msg": f"Processant {total_records} contractes (deduplicats)...", "progress": 20})}\n\n'
             
             nuevos = 0
             actualizados = 0
@@ -387,24 +396,14 @@ class SyncService:
                         existing.fecha_ultima_sincronizacion = datetime.now()
                         db.commit()
 
-                        # Re-enrich if updated
-                        if any([existing.url_json_licitacio, existing.url_json_avaluacio, 
-                               existing.url_json_adjudicacio, existing.url_json_formalitzacio]):
-                            try:
-                                yield f'data: {json.dumps({"msg": f"Re-enriquint contracte {expedient}...", "progress": prog})}\n\n'
-                                EnrichmentService.enrich_contract(db, existing.id)
-                            except Exception as ee:
-                                logger.warning(f"Error en enriquiment automàtic per {expedient}: {ee}")
-
-                        actualizados += 1
-                        
-                        msg_u = f"Actualitzat {expedient}"
                         if canvis:
+                            actualizados += 1
                             c_str = ", ".join(canvis)
                             detalles_log.append({"tipo": "actualitzat", "expedient": expedient, "missatge": f"S'han alterat els següents camps: {c_str}"})
                             msg_u = f"🔄 Actualitzat {expedient}: {c_str[:40]}..."
-                            
-                        yield f'data: {json.dumps({"msg": msg_u, "progress": prog})}\n\n'
+                            yield f'data: {json.dumps({"msg": msg_u, "progress": prog})}\n\n'
+                        else:
+                            sin_cambios += 1
                     else:
                         sin_cambios += 1
                 except Exception as e:
@@ -461,8 +460,18 @@ class SyncService:
             config_meses = db.query(models.Configuracion).filter(models.Configuracion.clave == 'dashboard_mesos_caducitat').first()
             mesos_alerta = int(config_meses.valor) if config_meses and config_meses.valor.isdigit() else 3
             
-            data = SyncService.fetch_data(db, codi_ine10)
-            logger.info(f"Fetched {len(data)} records")
+            raw_data = SyncService.fetch_data(db, codi_ine10)
+            logger.info(f"Fetched {len(raw_data)} records")
+            
+            # Deduplicació
+            dedup_map = {}
+            for r in raw_data:
+                key = (r.get("codi_expedient"), r.get("resultat") or r.get("fase_publicacio"), r.get("numero_lot"))
+                actualitzacio = SyncService.parse_date(r.get("data_actualitzacio")) or datetime.min
+                if key not in dedup_map or actualitzacio > dedup_map[key]["actualitzacio"]:
+                    dedup_map[key] = {"record": r, "actualitzacio": actualitzacio}
+            
+            data = [v["record"] for v in dedup_map.values()]
             sync.total_registros_api = len(data)
             
             # Load aliases
@@ -527,23 +536,21 @@ class SyncService:
                                 
                         nuevos += 1
                     elif existing.hash_contenido != record_hash:
-                        # Update existing - skip historial for performance
+                        # Update existing
+                        has_real_changes = False
                         for field, value in mapped_data.items():
-                            setattr(existing, field, value)
-                        existing.fecha_ultima_sincronizacion = datetime.now()
-                        db.commit()  # Commit immediately
-                        
-                        # Re-enrich if updated
-                        if any([existing.url_json_licitacio, existing.url_json_avaluacio, 
-                               existing.url_json_adjudicacio, existing.url_json_formalitzacio]):
-                            try:
-                                EnrichmentService.enrich_contract(db, existing.id)
-                            except Exception as ee:
-                                logger.warning(f"Error en enriquiment automàtic per {expedient}: {ee}")
+                            if field != 'hash_contenido' and getattr(existing, field) != value:
+                                setattr(existing, field, value)
+                                has_real_changes = True
                                 
-                        actualizados += 1
-                    else:
-                        sin_cambios += 1
+                        existing.hash_contenido = record_hash
+                        existing.fecha_ultima_sincronizacion = datetime.now()
+                        db.commit()
+                        
+                        if has_real_changes:
+                            actualizados += 1
+                        else:
+                            sin_cambios += 1
                 
                 except Exception as e:
                     db.rollback()  # Roll back failed record
