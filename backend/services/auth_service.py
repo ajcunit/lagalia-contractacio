@@ -83,6 +83,26 @@ class AuthService:
                 return None
 
             entry = conn.entries[0]
+            
+            # 1. Verificar grup obligatori si està configurat
+            group_required = ldap_config.get("ldap_group_required")
+            if group_required:
+                user_groups = []
+                if hasattr(entry, 'memberOf'):
+                    user_groups = (
+                        entry.memberOf.values
+                        if isinstance(entry.memberOf.values, list)
+                        else [entry.memberOf.value]
+                    )
+                
+                # Comprovar si algun dels grups de l'usuari coincideix amb el requerit
+                # (Fem cerca parcial per si el grup ve amb el DN complet)
+                if not any(group_required.lower() in ug.lower() for ug in user_groups):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="no tens permisos per accedir a l'aplicacio"
+                    )
+
             email = entry.mail.value if hasattr(entry, 'mail') and entry.mail.value else username
             if user_domain and "@" not in email:
                 email = f"{email}{user_domain}"

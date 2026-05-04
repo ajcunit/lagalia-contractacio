@@ -45,6 +45,8 @@ def get_config(clave: str, db: Session = Depends(get_db)):
             return {"id": 0, "clave": "ldap_user_domain", "valor": "", "descripcion": "Domini d'usuari (ex: @empresa.local)", "updated_at": None}
         if clave == "ldap_enabled":
             return {"id": 0, "clave": "ldap_enabled", "valor": "false", "descripcion": "Activa l'autenticació LDAP", "updated_at": None}
+        if clave == "ldap_group_required":
+            return {"id": 0, "clave": "ldap_group_required", "valor": "", "descripcion": "Grup de l'AD necessari per accedir (ex: G_LAGALIA_ACCES)", "updated_at": None}
         if clave == "dashboard_mesos_caducitat":
             return {"id": 0, "clave": "dashboard_mesos_caducitat", "valor": "3", "descripcion": "Mesos d'avís per venciment de contracte per defecte", "updated_at": None}
         if clave == "gestiona_integration_enabled":

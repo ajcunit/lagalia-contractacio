@@ -18,7 +18,8 @@ import {
     Search,
     Bell,
     Zap,
-    Boxes
+    Boxes,
+    Shield
 } from 'lucide-react';
 
 import Sincronizacion from './Sincronizacion';
@@ -49,6 +50,12 @@ export default function ConfiguracionPage() {
         'gestiona_integration_enabled': 'false',
         'gestiona_webhook_url': '',
         'gestiona_pool_url': '',
+        'ldap_server': '',
+        'ldap_port': '389',
+        'ldap_base_dn': '',
+        'ldap_user_domain': '',
+        'ldap_enabled': 'false',
+        'ldap_group_required': '',
         'module_pla_enabled': 'true',
         'module_generador_ia_enabled': 'true',
         'module_auditoria_ia_enabled': 'true',
@@ -80,6 +87,7 @@ export default function ConfiguracionPage() {
                 'ia_enabled', 'ai_provider', 'gemini_api_key', 'gemini_model',
                 'prompt_cpv_extract', 'prompt_cpv_rank', 'prompt_auditoria', 'dashboard_mesos_caducitat',
                 'gestiona_integration_enabled', 'gestiona_webhook_url', 'gestiona_pool_url',
+                'ldap_server', 'ldap_port', 'ldap_base_dn', 'ldap_user_domain', 'ldap_enabled', 'ldap_group_required',
                 'module_pla_enabled', 'module_generador_ia_enabled', 'module_auditoria_ia_enabled',
                 'module_revisions_enabled', 'module_superbuscador_enabled', 'module_cpv_enabled'
             ];
@@ -868,6 +876,86 @@ export default function ConfiguracionPage() {
                                         placeholder="https://vostrepoblacio.gestiona.es"
                                     />
                                     <p className="text-xs text-slate-400">URL base de la vostra instància de Gestiona (ex: https://ajuntament.gestiona.es).</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* LDAP / Active Directory */}
+                        <div className="glass-card p-6">
+                            <div className="flex items-center gap-2 mb-6 text-slate-800 font-semibold border-b border-slate-100 pb-4 justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Shield size={20} className="text-primary-500" />
+                                    <h2>Autenticació LDAP / Active Directory</h2>
+                                </div>
+                                <label className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input 
+                                            type="checkbox" 
+                                            className="sr-only" 
+                                            checked={configs.ldap_enabled === 'true'}
+                                            onChange={(e) => handleChange('ldap_enabled', e.target.checked ? 'true' : 'false')}
+                                        />
+                                        <div className={`block w-10 h-6 rounded-full transition-colors ${configs.ldap_enabled === 'true' ? 'bg-primary-500' : 'bg-slate-300'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${configs.ldap_enabled === 'true' ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                    <span className="ml-3 text-sm font-medium text-slate-700">Activar LDAP</span>
+                                </label>
+                            </div>
+                            
+                            <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${configs.ldap_enabled !== 'true' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Servidor LDAP / AD</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-slate-600 placeholder:text-slate-400"
+                                        placeholder="ldap://10.0.0.1"
+                                        value={configs.ldap_server}
+                                        onChange={(e) => handleChange('ldap_server', e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Port</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-slate-600 placeholder:text-slate-400"
+                                        placeholder="389 o 636"
+                                        value={configs.ldap_port}
+                                        onChange={(e) => handleChange('ldap_port', e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Base DN</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-slate-600 placeholder:text-slate-400"
+                                        placeholder="dc=ajuntament,dc=local"
+                                        value={configs.ldap_base_dn}
+                                        onChange={(e) => handleChange('ldap_base_dn', e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Domini d'usuari</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-slate-600 placeholder:text-slate-400"
+                                        placeholder="@ajuntament.local"
+                                        value={configs.ldap_user_domain}
+                                        onChange={(e) => handleChange('ldap_user_domain', e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                        <Users size={16} className="text-primary-500" />
+                                        Grup d'accés AD obligatori
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all text-slate-600 placeholder:text-slate-400"
+                                        placeholder="ex: G_LAGALIA_ACCES"
+                                        value={configs.ldap_group_required}
+                                        onChange={(e) => handleChange('ldap_group_required', e.target.value)}
+                                    />
+                                    <p className="text-[10px] text-slate-400">Si es posa un grup, només els membres d'aquest podran entrar.</p>
                                 </div>
                             </div>
                         </div>

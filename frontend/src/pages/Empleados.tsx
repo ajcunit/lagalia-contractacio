@@ -22,13 +22,6 @@ export default function Empleados() {
     const [loading, setLoading] = useState(true);
     const { sortedItems: empleados, sortConfig, requestSort } = useSortableData(empleadosRaw);
     const [activeTab, setActiveTab] = useState<'users' | 'ldap'>('users');
-    const [ldapConfig, setLdapConfig] = useState({
-        server: '',
-        port: '389',
-        base_dn: '',
-        user_domain: '',
-        enabled: false
-    });
     const [groupMappings, setGroupMappings] = useState<{ad_group: string, role: string, dept_id: number}[]>([]);
     const [ldapLoading, setLdapLoading] = useState(false);
     const [ldapSuccess, setLdapSuccess] = useState(false);
@@ -40,21 +33,7 @@ export default function Empleados() {
 
     const loadLdapConfig = async () => {
         try {
-            const [server, port, base_dn, domain, enabled, mappings] = await Promise.all([
-                api.getConfig('ldap_server'),
-                api.getConfig('ldap_port'),
-                api.getConfig('ldap_base_dn'),
-                api.getConfig('ldap_user_domain'),
-                api.getConfig('ldap_enabled'),
-                api.getConfig('ldap_group_mappings'),
-            ]);
-            setLdapConfig({
-                server: server.valor,
-                port: port.valor || '389',
-                base_dn: base_dn.valor,
-                user_domain: domain.valor,
-                enabled: enabled.valor === 'true'
-            });
+            const mappings = await api.getConfig('ldap_group_mappings');
             if (mappings.valor) {
                 try {
                     setGroupMappings(JSON.parse(mappings.valor));
@@ -74,14 +53,7 @@ export default function Empleados() {
         try {
             setLdapLoading(true);
             setLdapSuccess(false);
-            await Promise.all([
-                api.updateConfig('ldap_server', ldapConfig.server),
-                api.updateConfig('ldap_port', ldapConfig.port),
-                api.updateConfig('ldap_base_dn', ldapConfig.base_dn),
-                api.updateConfig('ldap_user_domain', ldapConfig.user_domain),
-                api.updateConfig('ldap_enabled', ldapConfig.enabled ? 'true' : 'false'),
-                api.updateConfig('ldap_group_mappings', JSON.stringify(groupMappings)),
-            ]);
+            await api.updateConfig('ldap_group_mappings', JSON.stringify(groupMappings));
             setLdapSuccess(true);
             setTimeout(() => setLdapSuccess(false), 3000);
         } catch (err) {
@@ -287,66 +259,7 @@ export default function Empleados() {
                         </div>
 
                         <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Servidor LDAP / Host</label>
-                                    <input
-                                        type="text"
-                                        className="input"
-                                        placeholder="ldap://10.0.0.1"
-                                        value={ldapConfig.server}
-                                        onChange={(e) => setLdapConfig({ ...ldapConfig, server: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">Port</label>
-                                    <input
-                                        type="text"
-                                        className="input"
-                                        placeholder="389"
-                                        value={ldapConfig.port}
-                                        onChange={(e) => setLdapConfig({ ...ldapConfig, port: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Base DN (Search Base)</label>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    placeholder="dc=empresa,dc=local"
-                                    value={ldapConfig.base_dn}
-                                    onChange={(e) => setLdapConfig({ ...ldapConfig, base_dn: e.target.value })}
-                                />
-                                <p className="text-xs text-slate-400 mt-1">Lloc on començar a cercar els usuaris.</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Domini d'Usuari (Suffix)</label>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    placeholder="@empresa.local"
-                                    value={ldapConfig.user_domain}
-                                    onChange={(e) => setLdapConfig({ ...ldapConfig, user_domain: e.target.value })}
-                                />
-                                <p className="text-xs text-slate-400 mt-1">S'afegirà automàticament al nom d'usuari si no l'escriuen.</p>
-                            </div>
-
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                                        checked={ldapConfig.enabled}
-                                        onChange={(e) => setLdapConfig({ ...ldapConfig, enabled: e.target.checked })}
-                                    />
-                                    <span className="text-sm font-medium text-slate-700">Activar Autenticació LDAP / Directori Actiu</span>
-                                </label>
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-100 mt-8">
+                            <div className="pt-4 border-t border-slate-100">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-2 text-slate-800 font-semibold">
                                         <Shield size={20} className="text-primary-500" />
